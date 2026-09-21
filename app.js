@@ -3,6 +3,11 @@
 const $ = (id) => document.getElementById(id);
 const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+/* Set a button's label to a Feather icon + text (preserves the inline SVG that
+ * a plain textContent assignment would wipe out). */
+const setBtnLabel = (btn, iconId, text) => {
+  btn.innerHTML = `<svg class="icon"><use href="#${iconId}"/></svg>${escHtml(text)}`;
+};
 
 const preview = $('preview');
 const previewEmpty = $('previewEmpty');
@@ -235,15 +240,18 @@ async function checkFfmpeg() {
     const r = await fetch('/api/ffmpeg-status');
     const j = await r.json();
     if (j.found) {
-      ffmpegStatus.textContent = 'ffmpeg: OK';
+      ffmpegStatus.innerHTML = `<svg class="icon sm"><use href="#i-check"/></svg>ffmpeg ready`;
       ffmpegStatus.className = 'ffmpeg-status ok';
+      ffmpegStatus.title = 'ffmpeg is available';
     } else {
-      ffmpegStatus.textContent = 'ffmpeg missing — winget install Gyan.FFmpeg';
+      ffmpegStatus.innerHTML = `<svg class="icon sm"><use href="#i-alert"/></svg>ffmpeg missing`;
       ffmpegStatus.className = 'ffmpeg-status bad';
+      ffmpegStatus.title = 'ffmpeg missing — run: winget install Gyan.FFmpeg';
     }
   } catch (e) {
-    ffmpegStatus.textContent = 'server unreachable';
+    ffmpegStatus.innerHTML = `<svg class="icon sm"><use href="#i-alert"/></svg>server unreachable`;
     ffmpegStatus.className = 'ffmpeg-status bad';
+    ffmpegStatus.title = 'Cannot reach the local server';
   }
 }
 
@@ -552,8 +560,9 @@ function renderSourceTimeline() {
   if (tlZoomInfo) {
     if (zoomed) {
       tlZoomInfo.hidden = false;
-      tlZoomInfo.textContent =
-        `🔍 ${fmtTime(viewLo())}–${fmtTime(viewLo() + viewSpan())} (${(c.duration / viewSpan()).toFixed(1)}×)`;
+      tlZoomInfo.innerHTML =
+        `<svg class="icon sm"><use href="#i-search"/></svg>` +
+        escHtml(`${fmtTime(viewLo())}–${fmtTime(viewLo() + viewSpan())} (${(c.duration / viewSpan()).toFixed(1)}×)`);
     } else {
       tlZoomInfo.hidden = true;
     }
@@ -652,7 +661,7 @@ function updateDeleteCutButton() {
   if (cut) {
     btnDeleteCut.hidden = false;
     const label = selectedCut ? 'Delete selected cut' : 'Delete cut';
-    btnDeleteCut.textContent = `✕ ${label} (${fmtTime(cut[1] - cut[0])})`;
+    setBtnLabel(btnDeleteCut, 'i-trash', `${label} (${fmtTime(cut[1] - cut[0])})`);
     btnDeleteCut._target = cut;
   } else {
     btnDeleteCut.hidden = true;
@@ -841,7 +850,7 @@ function paintScrub() {
   const cut = activeClip.cuts.find(([s, e]) => scrubTargetTime >= s && scrubTargetTime <= e);
   if (cut) {
     btnDeleteCut.hidden = false;
-    btnDeleteCut.textContent = `✕ Delete cut (${fmtTime(cut[1] - cut[0])})`;
+    setBtnLabel(btnDeleteCut, 'i-trash', `Delete cut (${fmtTime(cut[1] - cut[0])})`);
     btnDeleteCut._target = cut;
   } else {
     btnDeleteCut.hidden = true;
@@ -1618,8 +1627,16 @@ exportBtn.onclick = () => {
 };
 
 /* ---------- export settings dialog ---------- */
+const moreOptions = $('moreOptions');
 function openExportModal() {
   updateExportNote();
+  // Reveal "More options" up front if any advanced setting is non-default, so
+  // a changed resolution / disabled toggle is never hidden from the user.
+  if (moreOptions) {
+    const advanced = resolutionSelect.value !== 'source'
+      || !accurateMode.checked || !keepAudio.checked;
+    moreOptions.open = advanced;
+  }
   exportModal.hidden = false;
   // Focus the folder field if empty (the one thing that must be filled), else
   // the confirm button.

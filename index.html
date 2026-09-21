@@ -7,14 +7,41 @@
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+<!-- Feather icon sprite (inline, offline, currentColor). https://feathericons.com -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-folder-plus" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+  <symbol id="i-x-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></symbol>
+  <symbol id="i-mark-in" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></symbol>
+  <symbol id="i-mark-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></symbol>
+  <symbol id="i-grip" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></symbol>
+  <symbol id="i-chev-left" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></symbol>
+  <symbol id="i-chev-right" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></symbol>
+  <symbol id="i-scissors" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></symbol>
+  <symbol id="i-volume" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></symbol>
+  <symbol id="i-external" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></symbol>
+</svg>
 <header>
   <h1>Simple Video Editor</h1>
   <div class="ffmpeg-status" id="ffmpegStatus">checking ffmpeg...</div>
-  <button id="helpBtn" class="icon-btn" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">?</button>
+  <button id="helpBtn" class="icon-btn" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts"><svg class="icon"><use href="#i-help"/></svg></button>
   <div class="spacer"></div>
 
   <div class="export-bar">
-    <button id="exportBtn" class="primary">Export ▸</button>
+    <button id="exportBtn" class="primary"><svg class="icon"><use href="#i-download"/></svg>Export</button>
   </div>
 </header>
 
@@ -23,14 +50,14 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="exportModalTitle">
     <div class="modal-head">
       <h2 id="exportModalTitle">Export video</h2>
-      <button type="button" id="exportModalClose" class="modal-x" title="Close (Esc)">✕</button>
+      <button type="button" id="exportModalClose" class="modal-x" title="Close (Esc)"><svg class="icon"><use href="#i-x"/></svg></button>
     </div>
     <div class="modal-body">
       <div class="setting">
         <div class="setting-label">Save to folder</div>
         <div class="folder-field">
           <input type="text" id="outputDir" placeholder="C:\Users\you\Desktop">
-          <button id="pickFolderBtn" title="Browse...">📁</button>
+          <button id="pickFolderBtn" title="Browse..." aria-label="Browse for folder"><svg class="icon"><use href="#i-folder"/></svg></button>
         </div>
       </div>
       <div class="setting">
@@ -47,34 +74,41 @@
         </select>
       </div>
 
-      <div class="setting">
-        <div class="setting-label">Resolution</div>
-        <select id="resolutionSelect">
-          <option value="source" selected>Same as source</option>
-          <option value="1080">1080p (Full HD)</option>
-          <option value="720">720p (HD)</option>
-          <option value="480">480p</option>
-        </select>
-        <div class="setting-hint">Only downscales; never enlarges beyond the source.</div>
-      </div>
+      <!-- Progressive disclosure: the 90% path is folder+filename+quality;
+           resolution and the codec toggles live behind "More options". -->
+      <details class="more-options" id="moreOptions">
+        <summary><svg class="icon"><use href="#i-chev-right"/></svg>More options</summary>
+        <div class="more-options-body">
+          <div class="setting">
+            <div class="setting-label">Resolution</div>
+            <select id="resolutionSelect">
+              <option value="source" selected>Same as source</option>
+              <option value="1080">1080p (Full HD)</option>
+              <option value="720">720p (HD)</option>
+              <option value="480">480p</option>
+            </select>
+            <div class="setting-hint">Only downscales; never enlarges beyond the source.</div>
+          </div>
 
-      <div class="setting setting-checks">
-        <label class="check-row" title="Frame-accurate — re-encodes in one pass with GPU if available. Cuts land exactly where you set them and audio stays in sync. Off = stream-copy, near-instant, cuts snap to keyframes.">
-          <input type="checkbox" id="accurateMode" checked>
-          <span><strong>Accurate cuts</strong><small>Exact cut points, perfect A/V sync (re-encodes)</small></span>
-        </label>
-        <label class="check-row" title="Keep the original audio. Off = silent output.">
-          <input type="checkbox" id="keepAudio" checked>
-          <span><strong>Keep audio</strong><small>Off = silent video</small></span>
-        </label>
-      </div>
+          <div class="setting setting-checks">
+            <label class="check-row" title="Frame-accurate — re-encodes in one pass with GPU if available. Cuts land exactly where you set them and audio stays in sync. Off = stream-copy, near-instant, cuts snap to keyframes.">
+              <input type="checkbox" id="accurateMode" checked>
+              <span><strong>Accurate cuts</strong><small>Exact cut points, perfect A/V sync (re-encodes)</small></span>
+            </label>
+            <label class="check-row" title="Keep the original audio. Off = silent output.">
+              <input type="checkbox" id="keepAudio" checked>
+              <span><strong>Keep audio</strong><small>Off = silent video</small></span>
+            </label>
+          </div>
+        </div>
+      </details>
 
       <div class="modal-note" id="exportModalNote"></div>
       <div class="modal-dest" id="exportDest"></div>
     </div>
     <div class="modal-foot">
       <button type="button" id="exportCancelBtn">Cancel</button>
-      <button type="button" id="exportConfirmBtn" class="primary">Export ▸</button>
+      <button type="button" id="exportConfirmBtn" class="primary"><svg class="icon"><use href="#i-download"/></svg>Export</button>
     </div>
   </div>
 </div>
@@ -84,7 +118,7 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
     <div class="modal-head">
       <h2 id="helpModalTitle">Keyboard shortcuts</h2>
-      <button type="button" id="helpModalClose" class="modal-x" title="Close (Esc)">✕</button>
+      <button type="button" id="helpModalClose" class="modal-x" title="Close (Esc)"><svg class="icon"><use href="#i-x"/></svg></button>
     </div>
     <div class="modal-body">
       <div class="shortcuts-grid">
@@ -127,14 +161,15 @@
       <video id="preview" controls playsinline></video>
       <div class="preview-empty" id="previewEmpty">
         <div>
+          <div class="empty-icon"><svg class="icon lg"><use href="#i-play"/></svg></div>
           <div class="big">Drop videos anywhere to start</div>
           <div class="sub">or click <button type="button" class="inline-btn" id="pickFilesBtnInline">Choose files</button></div>
           <div class="empty-steps">
-            <span><b>1.</b> Add clips</span>
-            <span class="arrow">→</span>
-            <span><b>2.</b> Mark cuts to remove <kbd>C</kbd></span>
-            <span class="arrow">→</span>
-            <span><b>3.</b> Export</span>
+            <span><b>1</b> Add clips</span>
+            <svg class="icon sm empty-arrow"><use href="#i-chev-right"/></svg>
+            <span><b>2</b> Mark cuts to remove <kbd>C</kbd></span>
+            <svg class="icon sm empty-arrow"><use href="#i-chev-right"/></svg>
+            <span><b>3</b> Export</span>
           </div>
           <div class="empty-hint">Tip: scroll on the timeline to zoom · press <kbd>?</kbd> for all shortcuts</div>
         </div>
@@ -157,7 +192,7 @@
       <div class="timeline-labels">
         <span id="tlNow">0:00.00</span>
         <div class="timeline-tools">
-          <span id="tlZoomHint" class="zoom-hint" title="Scroll the mouse wheel over the timeline to zoom in/out.">⟲ scroll to zoom</span>
+          <span id="tlZoomHint" class="zoom-hint" title="Scroll the mouse wheel over the timeline to zoom in/out."><svg class="icon sm"><use href="#i-search"/></svg> scroll to zoom</span>
           <button type="button" id="tlZoomInfo" class="zoom-info" title="Zoomed in — scroll down on the timeline to zoom out, or click here to reset." hidden></button>
           <label class="speed-control" title="Playback speed — [ slower / ] faster, or \\ to reset to 1x.">
             <span>Speed</span>
@@ -171,6 +206,7 @@
           </label>
           <label class="skip-toggle" title="When on, playback jumps over the red cut regions so you preview the final edited result. Turn off to watch the raw source.">
             <input type="checkbox" id="skipCuts" checked>
+            <svg class="icon sm"><use href="#i-scissors"/></svg>
             <span>Skip cuts on play</span>
           </label>
         </div>
@@ -180,15 +216,15 @@
 
     <div class="cut-controls">
       <div class="cut-group">
-        <button id="btnMarkStart" title="C or I — mark cut start" disabled>◧ Mark IN (C)</button>
-        <button id="btnMarkEnd" title="C or O — mark cut end" disabled>◨ Mark OUT (C)</button>
-        <button id="btnCancelMark" class="ghost" title="Esc — cancel pending mark" disabled>Cancel</button>
+        <button id="btnMarkStart" title="C or I — mark cut start" disabled><svg class="icon"><use href="#i-mark-in"/></svg>Mark IN <kbd>C</kbd></button>
+        <button id="btnMarkEnd" title="C or O — mark cut end" disabled><svg class="icon"><use href="#i-mark-out"/></svg>Mark OUT <kbd>C</kbd></button>
+        <button id="btnCancelMark" class="ghost icon-only" title="Esc — cancel pending mark" aria-label="Cancel pending mark" disabled><svg class="icon"><use href="#i-x-circle"/></svg></button>
       </div>
       <div class="cut-group">
-        <button id="btnUndoCut" class="ghost" title="Ctrl+Z — undo" disabled>↶ Undo</button>
-        <button id="btnRedo" class="ghost" title="Ctrl+Shift+Z — redo" disabled>↷ Redo</button>
+        <button id="btnUndoCut" class="ghost icon-only" title="Undo (Ctrl+Z)" aria-label="Undo" disabled><svg class="icon"><use href="#i-undo"/></svg></button>
+        <button id="btnRedo" class="ghost icon-only" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled><svg class="icon"><use href="#i-redo"/></svg></button>
       </div>
-      <button id="btnDeleteCut" class="delete-cut" title="Delete the cut under the playhead" hidden>✕ Delete cut</button>
+      <button id="btnDeleteCut" class="delete-cut" title="Delete the cut under the playhead" hidden><svg class="icon"><use href="#i-trash"/></svg>Delete cut</button>
       <div class="cut-stats" id="cutStats"></div>
     </div>
   </section>
@@ -199,9 +235,9 @@
     <strong>Clips</strong>
     <span class="strip-totals" id="stripTotals"></span>
     <div class="strip-actions">
-      <button id="pickFilesBtn" class="inline-btn" type="button">+ Add files</button>
+      <button id="pickFilesBtn" class="inline-btn" type="button"><svg class="icon"><use href="#i-folder-plus"/></svg>Add files</button>
       <details class="paths-details">
-        <summary>By path</summary>
+        <summary><svg class="icon sm caret"><use href="#i-chev-right"/></svg>By path</summary>
         <textarea id="pathInput" rows="2" placeholder="C:\Users\you\Videos\clip1.mp4"></textarea>
         <button id="addBtn">Add</button>
       </details>
@@ -218,7 +254,7 @@
   <div class="job-bar"><div id="jobBar"></div></div>
   <div class="job-meta" id="jobMeta"></div>
   <div class="job-actions">
-    <button id="jobRevealBtn" class="primary" type="button" hidden>Open folder</button>
+    <button id="jobRevealBtn" class="primary" type="button" hidden><svg class="icon"><use href="#i-external"/></svg>Open folder</button>
     <button id="jobCancelBtn" type="button">Cancel</button>
     <button id="jobDismissBtn" type="button" hidden>Dismiss</button>
   </div>
@@ -231,7 +267,7 @@
 <template id="clipTileTemplate">
   <div class="clip-tile" tabindex="0" draggable="true">
     <div class="tile-thumb">
-      <div class="tile-grip" title="Drag to reorder">⠿</div>
+      <div class="tile-grip" title="Drag to reorder"><svg class="icon sm"><use href="#i-grip"/></svg></div>
       <video class="tile-video" muted playsinline preload="metadata"></video>
       <div class="tile-dur"></div>
     </div>
@@ -240,9 +276,9 @@
     </div>
     <div class="tile-name"></div>
     <div class="tile-actions">
-      <button class="tile-left" title="Move left">◀</button>
-      <button class="tile-right" title="Move right">▶</button>
-      <button class="tile-remove" title="Remove">✕</button>
+      <button class="tile-left" title="Move left" aria-label="Move left"><svg class="icon sm"><use href="#i-chev-left"/></svg></button>
+      <button class="tile-right" title="Move right" aria-label="Move right"><svg class="icon sm"><use href="#i-chev-right"/></svg></button>
+      <button class="tile-remove" title="Remove" aria-label="Remove"><svg class="icon sm"><use href="#i-x"/></svg></button>
     </div>
   </div>
 </template>
