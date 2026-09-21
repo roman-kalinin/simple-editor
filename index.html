@@ -179,11 +179,15 @@
     </div>
 
     <div class="cut-controls">
-      <button id="btnMarkStart" title="C or I — mark cut start" disabled>◧ Mark IN (C)</button>
-      <button id="btnMarkEnd" title="C or O — mark cut end" disabled>◨ Mark OUT (C)</button>
-      <button id="btnCancelMark" title="Esc — cancel pending mark" disabled>Cancel</button>
-      <button id="btnUndoCut" title="Ctrl+Z — undo" disabled>↶ Undo</button>
-      <button id="btnRedo" title="Ctrl+Shift+Z — redo" disabled>↷ Redo</button>
+      <div class="cut-group">
+        <button id="btnMarkStart" title="C or I — mark cut start" disabled>◧ Mark IN (C)</button>
+        <button id="btnMarkEnd" title="C or O — mark cut end" disabled>◨ Mark OUT (C)</button>
+        <button id="btnCancelMark" class="ghost" title="Esc — cancel pending mark" disabled>Cancel</button>
+      </div>
+      <div class="cut-group">
+        <button id="btnUndoCut" class="ghost" title="Ctrl+Z — undo" disabled>↶ Undo</button>
+        <button id="btnRedo" class="ghost" title="Ctrl+Shift+Z — redo" disabled>↷ Redo</button>
+      </div>
       <button id="btnDeleteCut" class="delete-cut" title="Delete the cut under the playhead" hidden>✕ Delete cut</button>
       <div class="cut-stats" id="cutStats"></div>
     </div>

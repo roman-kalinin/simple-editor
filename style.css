@@ -11,9 +11,23 @@
   --accent: #3b7dd8;
   --accent-hi: #4a8ce8;
   --danger: #d04040;
+  --danger-bg: rgba(208, 64, 64, 0.14);
+  --danger-bg-hi: rgba(208, 64, 64, 0.30);
   --cut: rgba(220, 70, 70, 0.55);
   --cut-hi: #ff7070;
   --mark: #ffd060;
+  --warn: #d8b35a;
+  /* motion */
+  --t-fast: 90ms;
+  --t-med: 160ms;
+  --ease: cubic-bezier(.2, .6, .2, 1);
+  /* type ramp */
+  --fs-micro: 10px;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 15px;
+  --fs-xl: 18px;
 }
 html, body {
   margin: 0;
@@ -36,19 +50,22 @@ body {
 header {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 8px 16px;
+  gap: 12px;
+  padding: 10px 16px;
   background: #0c0c0c;
   border-bottom: 1px solid var(--border);
   min-width: 0;
   flex-wrap: nowrap;
   overflow: hidden;
 }
-header h1 { margin: 0; font-size: 16px; font-weight: 600; flex-shrink: 0; }
+header h1 { margin: 0; font-size: var(--fs-lg); font-weight: 600; flex-shrink: 0; }
 .spacer { flex: 1; }
+/* Header controls share one height so the top row reads as a single band. */
 .ffmpeg-status {
-  font-size: 11px; color: var(--text-dim); padding: 3px 8px; border-radius: 3px;
-  background: #181818;
+  height: 26px; display: inline-flex; align-items: center;
+  font-size: var(--fs-xs); color: var(--text-dim); padding: 0 10px; border-radius: 4px;
+  background: #181818; flex-shrink: 0;
+  max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .ffmpeg-status.bad { color: #ff9090; background: #2a1414; }
 .ffmpeg-status.ok { color: #7ede7e; background: #142a14; }
@@ -70,15 +87,21 @@ button, .inline-btn {
   background: var(--bg-4); color: var(--text); border: 1px solid var(--border-hi);
   padding: 5px 10px; border-radius: 3px; cursor: pointer; font-size: 12px;
   font-family: inherit;
-  transition: background 0.1s;
+  transition: background var(--t-fast);
 }
 button:hover:not(:disabled), .inline-btn:hover { background: #333; }
-button:disabled { opacity: 0.3; cursor: not-allowed; }
+button:disabled { opacity: 0.4; filter: saturate(0.6); cursor: not-allowed; }
 button.primary {
   background: var(--accent); border-color: var(--accent-hi); font-weight: 600;
   padding: 8px 18px; font-size: 13px;
 }
 button.primary:hover:not(:disabled) { background: var(--accent-hi); }
+/* Ghost = secondary action: transparent until hover. Primary blue and danger
+ * red stay the only saturated buttons, so hierarchy reads at a glance. */
+button.ghost {
+  background: transparent; border-color: var(--border-hi); color: var(--text-dim);
+}
+button.ghost:hover:not(:disabled) { background: var(--bg-4); color: var(--text); }
 
 input[type=text] {
   background: #0f0f0f; color: var(--text); border: 1px solid var(--border-hi);
@@ -96,12 +119,16 @@ input[type=text]:focus { outline: none; border-color: var(--accent); }
 
 /* Round header help button. */
 .icon-btn {
-  width: 22px; height: 22px; padding: 0; border-radius: 50%;
-  font-weight: 700; font-size: 12px; line-height: 1;
+  width: 26px; height: 26px; padding: 0; border-radius: 50%;
+  font-weight: 700; font-size: var(--fs-md); line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
   color: var(--text-dim); background: #181818; border: 1px solid var(--border-hi);
   flex-shrink: 0;
 }
 .icon-btn:hover { color: var(--text); background: var(--bg-4); }
+/* Header Export sits at the shared control height (~30px), not the taller
+ * modal primary size. */
+.export-bar .primary { padding: 6px 16px; }
 
 /* Small keycap style, reused in help panel + hints. */
 kbd {
@@ -196,8 +223,8 @@ kbd {
 }
 .tl-tick-label {
   position: absolute; top: 6px; left: 2px;
-  font-family: Consolas, monospace; font-size: 9px; line-height: 1;
-  color: var(--text-dim); opacity: 0.65; white-space: nowrap;
+  font-family: Consolas, monospace; font-size: var(--fs-micro); line-height: 1;
+  color: var(--text-dim); opacity: 0.7; white-space: nowrap;
 }
 .timeline-progress {
   position: absolute; left: 0; bottom: 0; height: 4px;
@@ -216,7 +243,7 @@ kbd {
 .playhead-time {
   position: absolute; bottom: calc(100% + 2px); left: 50%;
   transform: translateX(-50%);
-  font-family: Consolas, monospace; font-size: 9px; line-height: 1.3;
+  font-family: Consolas, monospace; font-size: var(--fs-micro); line-height: 1.3;
   color: #fff; background: rgba(20, 20, 20, 0.9);
   border: 1px solid var(--border-hi); border-radius: 3px;
   padding: 1px 4px; white-space: nowrap;
@@ -248,7 +275,7 @@ kbd {
   background: #111;
 }
 .thumb-preview .thumb-time {
-  font-family: Consolas, monospace; font-size: 11px; color: #fff;
+  font-family: Consolas, monospace; font-size: var(--fs-xs); color: #fff;
   text-align: center; padding: 2px 0;
   background: rgba(0, 0, 0, 0.7);
 }
@@ -270,7 +297,7 @@ kbd {
   /* Bands are clickable (to select) even though the overlay isn't. */
   pointer-events: auto;
   cursor: pointer;
-  transition: filter 0.1s;
+  transition: filter var(--t-fast);
   display: flex; align-items: center; justify-content: center;
   overflow: hidden;
 }
@@ -280,7 +307,7 @@ kbd {
   z-index: 5;
 }
 .cut-band-label {
-  font-family: Consolas, monospace; font-size: 10px; color: #fff;
+  font-family: Consolas, monospace; font-size: var(--fs-micro); color: #fff;
   background: rgba(120, 20, 20, 0.75); padding: 1px 5px; border-radius: 3px;
   pointer-events: none; white-space: nowrap;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
@@ -313,16 +340,17 @@ kbd {
 }
 .timeline-labels {
   display: flex; justify-content: space-between; align-items: center;
-  font-family: Consolas, monospace; font-size: 11px; color: var(--text-dim);
+  font-family: Consolas, monospace; font-size: var(--fs-xs); color: var(--text-dim);
+  flex-wrap: wrap; row-gap: 6px; gap: 12px;
 }
 .skip-toggle {
   display: flex; align-items: center; gap: 5px;
-  font-family: inherit; font-size: 11px; color: var(--text);
+  font-family: inherit; font-size: var(--fs-xs); color: var(--text);
   cursor: pointer; user-select: none;
 }
 .skip-toggle input { margin: 0; }
 .timeline-tools {
-  display: flex; align-items: center; gap: 14px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
 }
 .zoom-info {
   font-family: inherit; font-size: 11px;
@@ -351,9 +379,10 @@ kbd {
 }
 
 .cut-controls {
-  display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+  display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
   min-height: 32px; /* reserve room so show/hide of Delete doesn't jump the row */
 }
+.cut-group { display: flex; gap: 4px; align-items: center; }
 .cut-controls .cut-stats {
   margin-left: auto; font-family: Consolas, monospace; font-size: 11px; color: var(--text-dim);
   border-radius: 3px; padding: 1px 4px;
@@ -406,10 +435,18 @@ body.mark-pending #btnMarkEnd {
 .strip-header strong { font-size: 13px; }
 .strip-totals { font-size: 12px; color: var(--text-dim); font-family: Consolas, monospace; }
 .strip-actions { margin-left: auto; display: flex; gap: 8px; align-items: flex-start; }
-.paths-details { font-size: 11px; color: var(--text-dim); }
-.paths-details summary { cursor: pointer; padding: 5px 10px; border: 1px solid var(--border-hi); border-radius: 3px; background: var(--bg-4); list-style: none; }
+.paths-details { font-size: var(--fs-xs); color: var(--text-dim); }
+/* Demoted power-user affordance: a dashed ghost, clearly not a peer of the
+ * solid "+ Add files" button. */
+.paths-details summary {
+  cursor: pointer; padding: 5px 10px; border: 1px dashed var(--border-hi);
+  border-radius: 3px; background: transparent; color: var(--text-dim);
+  list-style: none; transition: color var(--t-fast), border-color var(--t-fast);
+}
+.paths-details summary::before { content: "▸ "; display: inline-block; transition: transform var(--t-fast); }
+.paths-details summary:hover { color: var(--text); border-color: var(--text-dim); }
 .paths-details summary::-webkit-details-marker { display: none; }
-.paths-details[open] summary { background: #333; }
+.paths-details[open] summary::before { content: "▾ "; }
 .paths-details textarea {
   display: block; width: 320px; margin-top: 6px;
   background: #0f0f0f; color: var(--text); border: 1px solid var(--border-hi);
@@ -443,7 +480,7 @@ body.mark-pending #btnMarkEnd {
   display: flex; flex-direction: column;
   cursor: pointer;
   outline: none;
-  transition: border-color 0.1s, transform 0.05s;
+  transition: border-color var(--t-fast), transform var(--t-fast) var(--ease), box-shadow var(--t-fast);
   user-select: none;
 }
 .clip-tile:hover { border-color: var(--border-hi); }
@@ -487,7 +524,7 @@ body.mark-pending #btnMarkEnd {
   position: absolute; top: 4px; left: 4px; z-index: 2;
   font-size: 12px; line-height: 1; color: #fff;
   background: rgba(0, 0, 0, 0.55); border-radius: 3px; padding: 2px 4px;
-  cursor: grab; opacity: 0; transition: opacity 0.1s;
+  cursor: grab; opacity: 0; transition: opacity var(--t-fast);
 }
 .clip-tile:hover .tile-grip, .clip-tile:focus-visible .tile-grip { opacity: 0.85; }
 .tile-dur {
@@ -520,14 +557,14 @@ body.mark-pending #btnMarkEnd {
 }
 .tile-actions button { flex: 1; padding: 3px 4px; font-size: 11px; }
 .tile-actions .tile-left, .tile-actions .tile-right {
-  opacity: 0; transition: opacity 0.1s;
+  opacity: 0; transition: opacity var(--t-fast);
 }
 .clip-tile:hover .tile-actions .tile-left,
 .clip-tile:hover .tile-actions .tile-right,
 .clip-tile:focus-within .tile-actions .tile-left,
 .clip-tile:focus-within .tile-actions .tile-right { opacity: 1; }
-.tile-actions .tile-remove { flex: 0 0 28px; background: #3a1e1e; border-color: #5a2d2d; }
-.tile-actions .tile-remove:hover { background: #5a2d2d; }
+.tile-actions .tile-remove { flex: 0 0 28px; background: var(--danger-bg); border-color: var(--danger); color: #ffb0b0; }
+.tile-actions .tile-remove:hover { background: var(--danger-bg-hi); color: #fff; }
 
 /* ---------- upload snackbars ---------- */
 .snackbars {
@@ -563,7 +600,7 @@ body.mark-pending #btnMarkEnd {
 .upload-item .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .upload-item .bar { grid-column: 1 / -1; height: 3px; background: #0a0a0a; border-radius: 2px; overflow: hidden; }
 .upload-item .bar > div { height: 100%; width: 0%; background: var(--accent); transition: width 0.1s; }
-.upload-item.err { border-color: #5a2d2d; background: rgba(40, 20, 20, 0.96); }
+.upload-item.err { border-color: var(--danger); background: rgba(40, 20, 20, 0.96); }
 .upload-item.err .bar > div { background: var(--danger); }
 .upload-item.done { opacity: 0.55; }
 .upload-item.done .bar > div { background: #4a8a4a; }
@@ -602,19 +639,6 @@ body.mark-pending #btnMarkEnd {
 .job-meta:empty { display: none; }
 .job-actions { display: flex; gap: 6px; justify-content: flex-end; }
 .job-actions button { padding: 3px 10px; font-size: 11px; }
-
-/* ---------- accurate toggle ---------- */
-.accurate-toggle {
-  display: flex !important; flex-direction: row !important; align-items: center;
-  gap: 5px; padding: 4px 8px; border: 1px solid var(--border-hi);
-  border-radius: 3px; background: var(--bg-3);
-  cursor: pointer; user-select: none;
-  text-transform: none !important; letter-spacing: 0 !important;
-  font-size: 11px !important; color: var(--text) !important;
-  align-self: flex-end;
-}
-.accurate-toggle input { margin: 0; }
-.accurate-toggle:hover { background: var(--bg-4); }
 
 /* ---------- drag overlay ---------- */
 .drop-overlay {
@@ -687,14 +711,18 @@ body.mark-pending #btnMarkEnd {
 .check-row span { display: flex; flex-direction: column; gap: 1px; }
 .check-row strong { font-size: 13px; font-weight: 600; color: var(--text); }
 .check-row small { font-size: 11px; color: var(--text-dim); }
-.modal-note { font-size: 11px; color: #d8b35a; min-height: 0; }
+.modal-note { font-size: var(--fs-sm); color: var(--text-dim); min-height: 0; }
+.modal-note.warn { color: var(--warn); }
 .modal-note:empty { display: none; }
 .modal-foot {
   display: flex; justify-content: flex-end; gap: 8px;
   padding: 12px 16px; border-top: 1px solid var(--border);
 }
-.modal-foot button { padding: 8px 16px; font-size: 13px; }
-.modal-note { font-size: 12px; color: var(--text-dim); }
+.modal-foot button { padding: 8px 16px; font-size: var(--fs-md); }
+.modal-foot button:not(.primary) {
+  background: transparent; border-color: var(--border-hi); color: var(--text-dim);
+}
+.modal-foot button:not(.primary):hover { background: var(--bg-4); color: var(--text); }
 
 /* ---------- shortcuts panel ---------- */
 .shortcuts-grid { display: flex; flex-direction: column; gap: 4px; }

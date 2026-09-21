@@ -1644,6 +1644,7 @@ function updateExportNote() {
   const accurate = accurateMode.checked;
   const res = resolutionSelect.value;
   const bits = [];
+  let warn = false;
   if (accurate) {
     bits.push('Re-encodes for exact cuts — slower, but frame-accurate and perfectly in sync.');
   } else {
@@ -1651,8 +1652,10 @@ function updateExportNote() {
   }
   if (res !== 'source' && !accurate) {
     bits.push('Resolution change requires re-encoding — Accurate will be used.');
+    warn = true;
   }
   exportModalNote.textContent = bits.join(' ');
+  exportModalNote.classList.toggle('warn', warn);
   // Live destination summary so the user sees where the file lands.
   const out = buildOutputPath();
   exportDest.textContent = out ? `→ ${out}` : 'Choose a folder to save to.';
