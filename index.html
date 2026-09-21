@@ -10,20 +10,10 @@
 <header>
   <h1>Simple Video Editor</h1>
   <div class="ffmpeg-status" id="ffmpegStatus">checking ffmpeg...</div>
+  <button id="helpBtn" class="icon-btn" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">?</button>
   <div class="spacer"></div>
 
   <div class="export-bar">
-    <div class="export-fields">
-      <label>Folder
-        <div class="folder-field">
-          <input type="text" id="outputDir" placeholder="C:\Users\you\Desktop">
-          <button id="pickFolderBtn" title="Browse...">📁</button>
-        </div>
-      </label>
-      <label>Filename
-        <input type="text" id="outputName" placeholder="edit.mp4">
-      </label>
-    </div>
     <button id="exportBtn" class="primary">Export ▸</button>
   </div>
 </header>
@@ -36,6 +26,18 @@
       <button type="button" id="exportModalClose" class="modal-x" title="Close (Esc)">✕</button>
     </div>
     <div class="modal-body">
+      <div class="setting">
+        <div class="setting-label">Save to folder</div>
+        <div class="folder-field">
+          <input type="text" id="outputDir" placeholder="C:\Users\you\Desktop">
+          <button id="pickFolderBtn" title="Browse...">📁</button>
+        </div>
+      </div>
+      <div class="setting">
+        <div class="setting-label">Filename</div>
+        <input type="text" id="outputName" placeholder="edit.mp4">
+      </div>
+
       <div class="setting">
         <div class="setting-label">Quality</div>
         <select id="qualitySelect">
@@ -68,10 +70,53 @@
       </div>
 
       <div class="modal-note" id="exportModalNote"></div>
+      <div class="modal-dest" id="exportDest"></div>
     </div>
     <div class="modal-foot">
       <button type="button" id="exportCancelBtn">Cancel</button>
       <button type="button" id="exportConfirmBtn" class="primary">Export ▸</button>
+    </div>
+  </div>
+</div>
+
+<!-- Keyboard shortcuts dialog -->
+<div id="helpModal" class="modal-backdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
+    <div class="modal-head">
+      <h2 id="helpModalTitle">Keyboard shortcuts</h2>
+      <button type="button" id="helpModalClose" class="modal-x" title="Close (Esc)">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="shortcuts-grid">
+        <div class="sc-group">Playback</div>
+        <dl>
+          <dt><kbd>Space</kbd></dt><dd>Play / pause (skips cut regions)</dd>
+          <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Step 0.1s (hold <kbd>Shift</kbd> = 1s)</dd>
+          <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Slower / faster playback</dd>
+          <dt><kbd>\</kbd></dt><dd>Reset speed to 1×</dd>
+        </dl>
+        <div class="sc-group">Cutting</div>
+        <dl>
+          <dt><kbd>C</kbd></dt><dd>Mark cut start, then cut end</dd>
+          <dt><kbd>I</kbd> / <kbd>O</kbd></dt><dd>Mark cut in / out</dd>
+          <dt><kbd>Del</kbd></dt><dd>Delete selected cut</dd>
+          <dt><kbd>Esc</kbd></dt><dd>Cancel pending mark / deselect</dd>
+        </dl>
+        <div class="sc-group">Timeline</div>
+        <dl>
+          <dt>Scroll</dt><dd>Zoom in / out toward the cursor</dd>
+          <dt>Click cut</dt><dd>Select it, then drag its edges to resize</dd>
+          <dt>Hover</dt><dd>Preview the frame under the cursor</dd>
+        </dl>
+        <div class="sc-group">Editing</div>
+        <dl>
+          <dt><kbd>Ctrl</kbd>+<kbd>Z</kbd></dt><dd>Undo</dd>
+          <dt><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></dt><dd>Redo</dd>
+        </dl>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" id="helpModalOk" class="primary">Got it</button>
     </div>
   </div>
 </div>
@@ -84,6 +129,14 @@
         <div>
           <div class="big">Drop videos anywhere to start</div>
           <div class="sub">or click <button type="button" class="inline-btn" id="pickFilesBtnInline">Choose files</button></div>
+          <div class="empty-steps">
+            <span><b>1.</b> Add clips</span>
+            <span class="arrow">→</span>
+            <span><b>2.</b> Mark cuts to remove <kbd>C</kbd></span>
+            <span class="arrow">→</span>
+            <span><b>3.</b> Export</span>
+          </div>
+          <div class="empty-hint">Tip: scroll on the timeline to zoom · press <kbd>?</kbd> for all shortcuts</div>
         </div>
       </div>
     </div>
@@ -103,6 +156,7 @@
       <div class="timeline-labels">
         <span id="tlNow">0:00.00</span>
         <div class="timeline-tools">
+          <span id="tlZoomHint" class="zoom-hint" title="Scroll the mouse wheel over the timeline to zoom in/out.">⟲ scroll to zoom</span>
           <button type="button" id="tlZoomInfo" class="zoom-info" title="Zoomed in — scroll down on the timeline to zoom out, or click here to reset." hidden></button>
           <label class="speed-control" title="Playback speed — [ slower / ] faster, or \\ to reset to 1x.">
             <span>Speed</span>

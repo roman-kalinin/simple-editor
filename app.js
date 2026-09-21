@@ -19,6 +19,11 @@ const tlThumbImg = $('tlThumbImg');
 const tlThumbTime = $('tlThumbTime');
 const speedSelect = $('speedSelect');
 const tlZoomInfo = $('tlZoomInfo');
+const tlZoomHint = $('tlZoomHint');
+const helpBtn = $('helpBtn');
+const helpModal = $('helpModal');
+const helpModalClose = $('helpModalClose');
+const helpModalOk = $('helpModalOk');
 
 const btnMarkStart = $('btnMarkStart');
 const btnMarkEnd = $('btnMarkEnd');
@@ -48,6 +53,7 @@ const exportModalClose = $('exportModalClose');
 const exportCancelBtn = $('exportCancelBtn');
 const exportConfirmBtn = $('exportConfirmBtn');
 const exportModalNote = $('exportModalNote');
+const exportDest = $('exportDest');
 const jobStatus = $('jobStatus');
 const jobMsg = $('jobMsg');
 const jobBar = $('jobBar');
@@ -421,6 +427,8 @@ function renderSourceTimeline() {
     tlNow.textContent = '0:00.00';
     tlDur.textContent = '0:00.00';
     cutStats.textContent = '';
+    document.body.classList.remove('mark-pending');
+    if (tlZoomHint) tlZoomHint.hidden = true;
     return;
   }
   // Drop a stale selection that no longer belongs to this clip.
@@ -475,7 +483,10 @@ function renderSourceTimeline() {
       tlCuts.appendChild(m);
     }
   }
-  // Reflect zoom state on the track (for styling + a small readout).
+  // Reflect a pending cut-start so the Mark OUT button pulses (CSS).
+  document.body.classList.toggle('mark-pending', c.pendingStart != null);
+  // Reflect zoom state on the track (for styling + a small readout). When
+  // zoomed, swap the "scroll to zoom" hint for the live range readout.
   const zoomed = viewEnd > viewStart;
   tlTrack.classList.toggle('zoomed', zoomed);
   if (tlZoomInfo) {
@@ -487,6 +498,7 @@ function renderSourceTimeline() {
       tlZoomInfo.hidden = true;
     }
   }
+  if (tlZoomHint) tlZoomHint.hidden = zoomed;
   cutStats.textContent =
     `kept ${fmtTime(clipKept(c))} / ${fmtTime(c.duration)} · ${c.cuts.length} cut${c.cuts.length === 1 ? '' : 's'}`;
 }
@@ -917,15 +929,25 @@ function toggleMark() {
 }
 
 document.addEventListener('keydown', (e) => {
+  // Help dialog: Esc / Enter / ? all close it.
+  if (helpModal && !helpModal.hidden) {
+    if (e.key === 'Escape' || e.key === 'Enter' || e.key === '?') {
+      e.preventDefault(); closeHelpModal();
+    }
+    return;
+  }
   // Export dialog: Esc closes it, Enter confirms — regardless of focus.
   if (exportModal && !exportModal.hidden) {
     if (e.key === 'Escape') { e.preventDefault(); closeExportModal(); }
-    else if (e.key === 'Enter') { e.preventDefault(); closeExportModal(); runExport(); }
+    else if (e.key === 'Enter') { e.preventDefault(); confirmExport(); }
     return;
   }
 
   const tag = (e.target.tagName || '').toLowerCase();
   if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+  // "?" opens the shortcuts panel from anywhere (outside inputs).
+  if (e.key === '?') { e.preventDefault(); openHelpModal(); return; }
 
   // Undo/redo work even without an active clip selection focus.
   //   Ctrl/Cmd+Z         — undo
@@ -1495,7 +1517,6 @@ exportBtn.onclick = () => {
     );
     return;
   }
-  if (!outputDir.value.trim()) { alert('Choose an output folder.'); return; }
   const payload = clips.map((c) => ({ path: c.path, keep: buildKeepRanges(c) }));
   if (payload.every((c) => c.keep.length === 0)) {
     alert('All clips are fully cut out — nothing to export.');
@@ -1508,9 +1529,23 @@ exportBtn.onclick = () => {
 function openExportModal() {
   updateExportNote();
   exportModal.hidden = false;
-  exportConfirmBtn.focus();
+  // Focus the folder field if empty (the one thing that must be filled), else
+  // the confirm button.
+  if (!outputDir.value.trim()) outputDir.focus();
+  else exportConfirmBtn.focus();
 }
 function closeExportModal() { exportModal.hidden = true; }
+
+/* Build the final output path from the folder + filename fields (or null if
+ * folder is empty). Also normalizes a missing/incorrect .mp4 extension. */
+function buildOutputPath() {
+  const dir = outputDir.value.trim().replace(/^"|"$/g, '');
+  if (!dir) return null;
+  let name = outputName.value.trim().replace(/^"|"$/g, '');
+  if (!name) name = `edit_${Date.now()}.mp4`;
+  if (!/\.mp4$/i.test(name)) name += '.mp4';
+  return dir.replace(/[\\/]+$/, '') + '\\' + name;
+}
 
 function updateExportNote() {
   // Summarize what will happen so the choice is legible.
@@ -1524,15 +1559,35 @@ function updateExportNote() {
     bits.push('Resolution change requires re-encoding — Accurate will be used.');
   }
   exportModalNote.textContent = bits.join(' ');
+  // Live destination summary so the user sees where the file lands.
+  const out = buildOutputPath();
+  exportDest.textContent = out ? `→ ${out}` : 'Choose a folder to save to.';
 }
 accurateMode.addEventListener('change', updateExportNote);
 resolutionSelect.addEventListener('change', updateExportNote);
+outputDir.addEventListener('input', updateExportNote);
+outputName.addEventListener('input', updateExportNote);
 exportModalClose.onclick = closeExportModal;
 exportCancelBtn.onclick = closeExportModal;
 exportModal.addEventListener('click', (e) => {
   if (e.target === exportModal) closeExportModal();
 });
-exportConfirmBtn.onclick = () => { closeExportModal(); runExport(); };
+function confirmExport() {
+  if (!buildOutputPath()) { outputDir.focus(); updateExportNote(); return; }
+  closeExportModal();
+  runExport();
+}
+exportConfirmBtn.onclick = confirmExport;
+
+/* ---------- keyboard shortcuts dialog ---------- */
+function openHelpModal() { helpModal.hidden = false; helpModalOk.focus(); }
+function closeHelpModal() { helpModal.hidden = true; }
+if (helpBtn) helpBtn.onclick = openHelpModal;
+if (helpModalClose) helpModalClose.onclick = closeHelpModal;
+if (helpModalOk) helpModalOk.onclick = closeHelpModal;
+if (helpModal) helpModal.addEventListener('click', (e) => {
+  if (e.target === helpModal) closeHelpModal();
+});
 
 /* Remember export settings across sessions. */
 const EXPORT_SETTINGS_KEY = 'simple-editor-export-settings-v1';
@@ -1562,14 +1617,8 @@ for (const el of [qualitySelect, resolutionSelect, accurateMode, keepAudio]) {
 loadExportSettings();
 
 async function runExport() {
-  const dir = outputDir.value.trim().replace(/^"|"$/g, '');
-  let name = outputName.value.trim().replace(/^"|"$/g, '');
-  if (!dir) { alert('Choose an output folder.'); return; }
-  if (!name) name = `edit_${Date.now()}.mp4`;
-  if (!/\.mp4$/i.test(name)) name += '.mp4';
-
-  // Windows path join.
-  const out = dir.replace(/[\\/]+$/, '') + '\\' + name;
+  const out = buildOutputPath();
+  if (!out) { alert('Choose an output folder.'); return; }
 
   const payload = clips.map((c) => ({ path: c.path, keep: buildKeepRanges(c) }));
   if (payload.every((c) => c.keep.length === 0)) {
