@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Simple Video Editor</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <h1>Simple Video Editor</h1>
+  <div class="ffmpeg-status" id="ffmpegStatus">checking ffmpeg...</div>
+  <div class="spacer"></div>
+
+  <div class="export-bar">
+    <div class="export-fields">
+      <label>Folder
+        <div class="folder-field">
+          <input type="text" id="outputDir" placeholder="C:\Users\you\Desktop">
+          <button id="pickFolderBtn" title="Browse...">📁</button>
+        </div>
+      </label>
+      <label>Filename
+        <input type="text" id="outputName" placeholder="edit.mp4">
+      </label>
+    </div>
+    <button id="exportBtn" class="primary">Export ▸</button>
+  </div>
+</header>
+
+<!-- Export settings dialog -->
+<div id="exportModal" class="modal-backdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="exportModalTitle">
+    <div class="modal-head">
+      <h2 id="exportModalTitle">Export video</h2>
+      <button type="button" id="exportModalClose" class="modal-x" title="Close (Esc)">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="setting">
+        <div class="setting-label">Quality</div>
+        <select id="qualitySelect">
+          <option value="high">High — near-lossless, largest file</option>
+          <option value="balanced" selected>Balanced — great quality, reasonable size</option>
+          <option value="small">Small — more compression, smallest file</option>
+        </select>
+      </div>
+
+      <div class="setting">
+        <div class="setting-label">Resolution</div>
+        <select id="resolutionSelect">
+          <option value="source" selected>Same as source</option>
+          <option value="1080">1080p (Full HD)</option>
+          <option value="720">720p (HD)</option>
+          <option value="480">480p</option>
+        </select>
+        <div class="setting-hint">Only downscales; never enlarges beyond the source.</div>
+      </div>
+
+      <div class="setting setting-checks">
+        <label class="check-row" title="Frame-accurate — re-encodes in one pass with GPU if available. Cuts land exactly where you set them and audio stays in sync. Off = stream-copy, near-instant, cuts snap to keyframes.">
+          <input type="checkbox" id="accurateMode" checked>
+          <span><strong>Accurate cuts</strong><small>Exact cut points, perfect A/V sync (re-encodes)</small></span>
+        </label>
+        <label class="check-row" title="Keep the original audio. Off = silent output.">
+          <input type="checkbox" id="keepAudio" checked>
+          <span><strong>Keep audio</strong><small>Off = silent video</small></span>
+        </label>
+      </div>
+
+      <div class="modal-note" id="exportModalNote"></div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" id="exportCancelBtn">Cancel</button>
+      <button type="button" id="exportConfirmBtn" class="primary">Export ▸</button>
+    </div>
+  </div>
+</div>
+
+<main class="workspace">
+  <section class="preview-area">
+    <div class="preview-shell">
+      <video id="preview" controls playsinline></video>
+      <div class="preview-empty" id="previewEmpty">
+        <div>
+          <div class="big">Drop videos anywhere to start</div>
+          <div class="sub">or click <button type="button" class="inline-btn" id="pickFilesBtnInline">Choose files</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="preview-title" id="previewTitle"></div>
+
+    <div class="source-timeline" id="sourceTimeline">
+      <div class="timeline-track" id="tlTrack">
+        <div class="timeline-progress" id="tlProgress"></div>
+        <div class="cut-overlay" id="tlCuts"></div>
+        <div class="timeline-playhead" id="tlPlayhead"></div>
+        <div class="timeline-hover" id="tlHover"></div>
+      </div>
+      <div class="thumb-preview" id="tlThumb" hidden>
+        <img id="tlThumbImg" alt="">
+        <div class="thumb-time" id="tlThumbTime"></div>
+      </div>
+      <div class="timeline-labels">
+        <span id="tlNow">0:00.00</span>
+        <div class="timeline-tools">
+          <button type="button" id="tlZoomInfo" class="zoom-info" title="Zoomed in — scroll down on the timeline to zoom out, or click here to reset." hidden></button>
+          <label class="speed-control" title="Playback speed — [ slower / ] faster, or \\ to reset to 1x.">
+            <span>Speed</span>
+            <select id="speedSelect">
+              <option value="0.5">0.5×</option>
+              <option value="1" selected>1×</option>
+              <option value="1.5">1.5×</option>
+              <option value="2">2×</option>
+              <option value="4">4×</option>
+            </select>
+          </label>
+          <label class="skip-toggle" title="When on, playback jumps over the red cut regions so you preview the final edited result. Turn off to watch the raw source.">
+            <input type="checkbox" id="skipCuts" checked>
+            <span>Skip cuts on play</span>
+          </label>
+        </div>
+        <span id="tlDur">0:00.00</span>
+      </div>
+    </div>
+
+    <div class="cut-controls">
+      <button id="btnMarkStart" title="C or I — mark cut start" disabled>◧ Mark IN (C)</button>
+      <button id="btnMarkEnd" title="C or O — mark cut end" disabled>◨ Mark OUT (C)</button>
+      <button id="btnCancelMark" title="Esc — cancel pending mark" disabled>Cancel</button>
+      <button id="btnUndoCut" title="Ctrl+Z — undo" disabled>↶ Undo</button>
+      <button id="btnRedo" title="Ctrl+Shift+Z — redo" disabled>↷ Redo</button>
+      <button id="btnDeleteCut" class="delete-cut" title="Delete the cut under the playhead" hidden>✕ Delete cut</button>
+      <div class="cut-stats" id="cutStats"></div>
+    </div>
+  </section>
+</main>
+
+<section class="clip-strip-wrapper">
+  <div class="strip-header">
+    <strong>Clips</strong>
+    <span class="strip-totals" id="stripTotals"></span>
+    <div class="strip-actions">
+      <button id="pickFilesBtn" class="inline-btn" type="button">+ Add files</button>
+      <details class="paths-details">
+        <summary>By path</summary>
+        <textarea id="pathInput" rows="2" placeholder="C:\Users\you\Videos\clip1.mp4"></textarea>
+        <button id="addBtn">Add</button>
+      </details>
+    </div>
+  </div>
+  <div class="clip-strip" id="clipStrip">
+    <div class="clip-strip-empty">No clips yet — drop files anywhere, or click <em>+ Add files</em></div>
+  </div>
+</section>
+
+<div class="snackbars" id="uploadQueue"></div>
+<div class="job-toast" id="jobStatus">
+  <div class="job-msg" id="jobMsg"></div>
+  <div class="job-bar"><div id="jobBar"></div></div>
+  <div class="job-meta" id="jobMeta"></div>
+  <div class="job-actions">
+    <button id="jobCancelBtn" type="button">Cancel</button>
+    <button id="jobDismissBtn" type="button" hidden>Dismiss</button>
+  </div>
+</div>
+
+<div id="dropOverlay" class="drop-overlay">
+  <div>Drop MP4 files to add</div>
+</div>
+
+<template id="clipTileTemplate">
+  <div class="clip-tile" tabindex="0" draggable="true">
+    <div class="tile-thumb">
+      <video class="tile-video" muted playsinline preload="metadata"></video>
+      <div class="tile-dur"></div>
+    </div>
+    <div class="tile-mini">
+      <div class="tile-mini-cuts"></div>
+    </div>
+    <div class="tile-name"></div>
+    <div class="tile-actions">
+      <button class="tile-left" title="Move left">◀</button>
+      <button class="tile-right" title="Move right">▶</button>
+      <button class="tile-remove" title="Remove">✕</button>
+    </div>
+  </div>
+</template>
+
+<script src="/app.js"></script>
+</body>
+</html>

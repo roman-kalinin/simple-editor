@@ -1,0 +1,19 @@
+# Bundled binaries (huge, downloaded by build-installer.bat)
+ffmpeg.exe
+ffprobe.exe
+
+# Build / packaging artifacts
+build/
+dist/
+*.spec.bak
+__pycache__/
+*.pyc
+
+# Runtime / user data
+work/
+server.log
+*.log
+
+# OS cruft
+Thumbs.db
+.DS_Store
