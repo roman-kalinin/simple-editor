@@ -1487,6 +1487,26 @@ class Handler(BaseHTTPRequestHandler):
                     return self._send_json({"folder": folder})
                 except Exception as e:  # noqa: BLE001
                     return self._send_json({"error": str(e)}, 500)
+            if path == "/api/reveal":
+                # Open the OS file browser with the given file selected.
+                body = self._read_json()
+                target = Path(body.get("path", "")).resolve()
+                if not target.exists():
+                    return self._send_json({"error": f"Not found: {target}"}, 404)
+                try:
+                    if sys.platform == "darwin":
+                        subprocess.Popen(["open", "-R", str(target)],
+                                         creationflags=SUBPROCESS_FLAGS)
+                    elif os.name == "nt":
+                        # /select, highlights the file inside its folder.
+                        subprocess.Popen(f'explorer /select,"{target}"',
+                                         creationflags=SUBPROCESS_FLAGS)
+                    else:
+                        subprocess.Popen(["xdg-open", str(target.parent)],
+                                         creationflags=SUBPROCESS_FLAGS)
+                    return self._send_json({"ok": True})
+                except Exception as e:  # noqa: BLE001
+                    return self._send_json({"error": str(e)}, 500)
             self.send_error(404)
         except Exception as e:  # noqa: BLE001
             try:

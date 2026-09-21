@@ -164,7 +164,7 @@ kbd {
 }
 .empty-steps b { color: var(--accent); }
 .empty-steps .arrow { color: #555; }
-.empty-hint { margin-top: 12px; font-size: 11px; color: #777; }
+.empty-hint { margin-top: 12px; font-size: 11px; color: #8a8a8a; }
 
 .preview-title {
   font-family: Consolas, monospace; font-size: 12px; color: var(--text-dim);
@@ -185,18 +185,41 @@ kbd {
   cursor: pointer;
 }
 .timeline-track:hover { border-color: var(--border-hi); }
+/* Time ruler across the top of the track. */
+.timeline-ruler {
+  position: absolute; top: 0; left: 0; right: 0; height: 14px;
+  pointer-events: none; z-index: 4;
+}
+.tl-tick {
+  position: absolute; top: 0; width: 1px; height: 6px;
+  background: rgba(255, 255, 255, 0.22);
+}
+.tl-tick-label {
+  position: absolute; top: 6px; left: 2px;
+  font-family: Consolas, monospace; font-size: 9px; line-height: 1;
+  color: var(--text-dim); opacity: 0.65; white-space: nowrap;
+}
 .timeline-progress {
-  position: absolute; top: 0; bottom: 0; left: 0;
-  background: rgba(90, 140, 200, 0.25);
+  position: absolute; left: 0; bottom: 0; height: 4px;
+  background: var(--accent);
   width: 0;
-  pointer-events: none;
+  pointer-events: none; z-index: 3;
+  box-shadow: 0 0 4px rgba(90, 140, 200, 0.7);
 }
 .timeline-playhead {
   position: absolute; top: 0; bottom: 0; width: 3px;
   background: #fff;
   left: 0;
-  pointer-events: none;
+  pointer-events: none; z-index: 7;
   box-shadow: 0 0 4px rgba(255,255,255,0.6);
+}
+.playhead-time {
+  position: absolute; bottom: calc(100% + 2px); left: 50%;
+  transform: translateX(-50%);
+  font-family: Consolas, monospace; font-size: 9px; line-height: 1.3;
+  color: #fff; background: rgba(20, 20, 20, 0.9);
+  border: 1px solid var(--border-hi); border-radius: 3px;
+  padding: 1px 4px; white-space: nowrap;
 }
 .timeline-hover {
   position: absolute; top: 0; bottom: 0; width: 1px;
@@ -234,7 +257,7 @@ kbd {
   pointer-events: none;
 }
 .cut-band {
-  position: absolute; top: 0; bottom: 0;
+  position: absolute; top: 14px; bottom: 0;
   background: repeating-linear-gradient(
     45deg,
     rgba(220, 70, 70, 0.55),
@@ -247,10 +270,25 @@ kbd {
   /* Bands are clickable (to select) even though the overlay isn't. */
   pointer-events: auto;
   cursor: pointer;
+  transition: filter 0.1s;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
 }
+.cut-band:hover { filter: brightness(1.3); border-color: #fff; }
 .cut-band.selected {
   box-shadow: 0 0 0 2px #fff, 0 0 8px rgba(255, 255, 255, 0.6);
   z-index: 5;
+}
+.cut-band-label {
+  font-family: Consolas, monospace; font-size: 10px; color: #fff;
+  background: rgba(120, 20, 20, 0.75); padding: 1px 5px; border-radius: 3px;
+  pointer-events: none; white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+.cut-band.just-added { animation: cutFlash 0.4s ease-out; }
+@keyframes cutFlash {
+  0%   { box-shadow: 0 0 0 3px rgba(255,255,255,0.9), 0 0 14px rgba(255,255,255,0.7); filter: brightness(1.8); }
+  100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); filter: brightness(1); }
 }
 /* Resize handles — only rendered on the selected band. Wider than they look
  * so they're easy to grab; the visible grip is the inner bar. */
@@ -269,7 +307,7 @@ kbd {
   box-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
 }
 .pending-mark {
-  position: absolute; top: 0; bottom: 0; width: 2px;
+  position: absolute; top: 14px; bottom: 0; width: 2px;
   background: var(--mark);
   box-shadow: 0 0 4px var(--mark);
 }
@@ -295,7 +333,7 @@ kbd {
 }
 .zoom-info:hover { background: rgba(90, 140, 200, 0.32); }
 .zoom-hint {
-  font-size: 10px; color: var(--text-dim); opacity: 0.6;
+  font-size: 10px; color: var(--text-dim);
   user-select: none; white-space: nowrap;
 }
 .zoom-hint[hidden] { display: none; }
@@ -318,6 +356,12 @@ kbd {
 }
 .cut-controls .cut-stats {
   margin-left: auto; font-family: Consolas, monospace; font-size: 11px; color: var(--text-dim);
+  border-radius: 3px; padding: 1px 4px;
+}
+.cut-controls .cut-stats.flash { animation: statFlash 0.5s ease-out; }
+@keyframes statFlash {
+  0%   { color: #fff; background: rgba(90, 140, 200, 0.5); }
+  100% { color: var(--text-dim); background: transparent; }
 }
 /* Mark IN/OUT: clearer base contrast with a colored left accent. */
 #btnMarkStart, #btnMarkEnd {
@@ -438,6 +482,14 @@ body.mark-pending #btnMarkEnd {
   background: #000;
 }
 .tile-video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+/* Drag-to-reorder grip, revealed on hover. */
+.tile-grip {
+  position: absolute; top: 4px; left: 4px; z-index: 2;
+  font-size: 12px; line-height: 1; color: #fff;
+  background: rgba(0, 0, 0, 0.55); border-radius: 3px; padding: 2px 4px;
+  cursor: grab; opacity: 0; transition: opacity 0.1s;
+}
+.clip-tile:hover .tile-grip, .clip-tile:focus-visible .tile-grip { opacity: 0.85; }
 .tile-dur {
   position: absolute; right: 4px; bottom: 4px;
   background: rgba(0,0,0,0.7); padding: 1px 5px; border-radius: 2px;
@@ -445,7 +497,7 @@ body.mark-pending #btnMarkEnd {
 }
 .tile-mini {
   position: relative;
-  height: 6px;
+  height: 10px;
   background: #0a0a0a;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
@@ -460,12 +512,20 @@ body.mark-pending #btnMarkEnd {
   padding: 4px 6px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* Reorder arrows rest hidden and reveal on hover; remove stays visible. */
 .tile-actions {
   display: flex; gap: 2px;
   padding: 0 4px 4px;
   justify-content: space-between;
 }
-.tile-actions button { flex: 1; padding: 1px 4px; font-size: 11px; }
+.tile-actions button { flex: 1; padding: 3px 4px; font-size: 11px; }
+.tile-actions .tile-left, .tile-actions .tile-right {
+  opacity: 0; transition: opacity 0.1s;
+}
+.clip-tile:hover .tile-actions .tile-left,
+.clip-tile:hover .tile-actions .tile-right,
+.clip-tile:focus-within .tile-actions .tile-left,
+.clip-tile:focus-within .tile-actions .tile-right { opacity: 1; }
 .tile-actions .tile-remove { flex: 0 0 28px; background: #3a1e1e; border-color: #5a2d2d; }
 .tile-actions .tile-remove:hover { background: #5a2d2d; }
 
@@ -525,6 +585,11 @@ body.mark-pending #btnMarkEnd {
 .job-toast.err { border-color: #5a2d2d; background: #2a1414; color: #ff9090; }
 .job-toast.run { border-color: #5a4a2d; background: #1f1b10; color: #ffd060; }
 .job-msg { white-space: pre-wrap; word-break: break-word; }
+.job-msg b { display: block; font-size: 13px; margin-bottom: 2px; }
+.job-file {
+  display: block; font-family: Consolas, monospace; font-size: 12px;
+  color: var(--text); word-break: break-all;
+}
 .job-bar {
   height: 6px; background: #0a0a0a; border-radius: 3px; overflow: hidden;
 }
@@ -533,7 +598,7 @@ body.mark-pending #btnMarkEnd {
 }
 .job-toast.ok .job-bar > div { background: #4a8a4a; }
 .job-toast.err .job-bar > div { background: var(--danger); }
-.job-meta { font-size: 10px; opacity: 0.75; }
+.job-meta { font-size: 11px; opacity: 0.9; color: var(--text-dim); }
 .job-meta:empty { display: none; }
 .job-actions { display: flex; gap: 6px; justify-content: flex-end; }
 .job-actions button { padding: 3px 10px; font-size: 11px; }
@@ -629,7 +694,7 @@ body.mark-pending #btnMarkEnd {
   padding: 12px 16px; border-top: 1px solid var(--border);
 }
 .modal-foot button { padding: 8px 16px; font-size: 13px; }
-.modal-note { font-size: 12px; }
+.modal-note { font-size: 12px; color: var(--text-dim); }
 
 /* ---------- shortcuts panel ---------- */
 .shortcuts-grid { display: flex; flex-direction: column; gap: 4px; }

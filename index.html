@@ -144,9 +144,10 @@
 
     <div class="source-timeline" id="sourceTimeline">
       <div class="timeline-track" id="tlTrack">
+        <div class="timeline-ruler" id="tlRuler"></div>
         <div class="timeline-progress" id="tlProgress"></div>
         <div class="cut-overlay" id="tlCuts"></div>
-        <div class="timeline-playhead" id="tlPlayhead"></div>
+        <div class="timeline-playhead" id="tlPlayhead"><span class="playhead-time" id="tlPlayheadTime"></span></div>
         <div class="timeline-hover" id="tlHover"></div>
       </div>
       <div class="thumb-preview" id="tlThumb" hidden>
@@ -213,6 +214,7 @@
   <div class="job-bar"><div id="jobBar"></div></div>
   <div class="job-meta" id="jobMeta"></div>
   <div class="job-actions">
+    <button id="jobRevealBtn" class="primary" type="button" hidden>Open folder</button>
     <button id="jobCancelBtn" type="button">Cancel</button>
     <button id="jobDismissBtn" type="button" hidden>Dismiss</button>
   </div>
@@ -225,6 +227,7 @@
 <template id="clipTileTemplate">
   <div class="clip-tile" tabindex="0" draggable="true">
     <div class="tile-thumb">
+      <div class="tile-grip" title="Drag to reorder">⠿</div>
       <video class="tile-video" muted playsinline preload="metadata"></video>
       <div class="tile-dur"></div>
     </div>

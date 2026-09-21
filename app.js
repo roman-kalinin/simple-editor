@@ -1,14 +1,18 @@
 /* Simple Video Editor — DaVinci-style layout */
 
 const $ = (id) => document.getElementById(id);
+const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => (
+  { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const preview = $('preview');
 const previewEmpty = $('previewEmpty');
 const previewTitle = $('previewTitle');
 
 const tlTrack = $('tlTrack');
+const tlRuler = $('tlRuler');
 const tlProgress = $('tlProgress');
 const tlPlayhead = $('tlPlayhead');
+const tlPlayheadTime = $('tlPlayheadTime');
 const tlCuts = $('tlCuts');
 const tlNow = $('tlNow');
 const tlDur = $('tlDur');
@@ -328,6 +332,8 @@ function updateCutButtons() {
 /* The currently selected cut (the [s,e] array itself, by identity). Selecting
  * a cut reveals edge handles for resizing and enables Delete/Backspace. */
 let selectedCut = null;
+/* A cut that should play a one-shot "just created" flash on the next render. */
+let _flashCut = null;
 
 /* ---------- timeline zoom (scroll wheel) ----------
  * The track shows a *view window* [viewStart, viewEnd] of the clip, not
@@ -416,6 +422,48 @@ function syncPlayheadToView() {
   const pct = timeToPct(t);
   tlPlayhead.style.left = `${pct}%`;
   tlProgress.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+  if (tlPlayheadTime) tlPlayheadTime.textContent = fmtTime(t);
+}
+
+/* Pick a "nice" tick interval (seconds) so a view span shows ~6-9 ticks. */
+function niceStep(span) {
+  const target = span / 7;               // aim for ~7 ticks
+  const steps = [0.1, 0.25, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
+  for (const s of steps) if (s >= target) return s;
+  return 600;
+}
+
+/* Draw the time ruler (ticks + labels) across the visible window. */
+function renderRuler() {
+  if (!tlRuler) return;
+  tlRuler.innerHTML = '';
+  const c = activeClip;
+  if (!c || !c.duration) return;
+  const lo = viewLo(), span = viewSpan();
+  const hi = lo + span;
+  const step = niceStep(span);
+  // First tick at or after lo, aligned to the step grid.
+  let t = Math.ceil(lo / step) * step;
+  for (; t <= hi + 1e-6; t += step) {
+    const pct = timeToPct(t);
+    if (pct < 0 || pct > 100) continue;
+    const tick = document.createElement('div');
+    tick.className = 'tl-tick';
+    tick.style.left = `${pct}%`;
+    const lab = document.createElement('span');
+    lab.className = 'tl-tick-label';
+    lab.textContent = fmtTick(t, step);
+    tick.appendChild(lab);
+    tlRuler.appendChild(tick);
+  }
+}
+
+/* Compact tick label: show sub-second precision only when the step is <1s. */
+function fmtTick(t, step) {
+  const m = Math.floor(t / 60);
+  const s = t - m * 60;
+  if (step < 1) return `${m}:${s.toFixed(1).padStart(4, '0')}`;
+  return `${m}:${String(Math.round(s)).padStart(2, '0')}`;
 }
 
 function renderSourceTimeline() {
@@ -437,6 +485,7 @@ function renderSourceTimeline() {
   tlNow.textContent = fmtTime(preview.currentTime || 0);
   // Keep progress + playhead consistent with the current view on every render.
   syncPlayheadToView();
+  renderRuler();
   const lo = viewLo(), span = viewSpan();
   const hi = lo + span;
   for (const cut of c.cuts) {
@@ -449,12 +498,23 @@ function renderSourceTimeline() {
     const rightPct = timeToPct(e);
     const clampedLeft = Math.max(0, leftPct);
     const clampedRight = Math.min(100, rightPct);
+    const widthPct = Math.max(0, clampedRight - clampedLeft);
     band.style.left = `${clampedLeft}%`;
-    band.style.width = `${Math.max(0, clampedRight - clampedLeft)}%`;
+    band.style.width = `${widthPct}%`;
+    band.title = `Cut ${fmtTime(s)}–${fmtTime(e)}  (${fmtTime(e - s)})`;
     // Only show a resize handle for an edge that's actually visible.
     band._edgeLeftVisible = leftPct >= 0;
     band._edgeRightVisible = rightPct <= 100;
     band._cut = cut;
+    // A one-shot "just created" flash (set by markEnd via _flashCut).
+    if (cut === _flashCut) band.classList.add('just-added');
+    // Duration label when the band is wide enough to fit it.
+    if (widthPct > 8) {
+      const lbl = document.createElement('div');
+      lbl.className = 'cut-band-label';
+      lbl.textContent = fmtTime(e - s);
+      band.appendChild(lbl);
+    }
     // Click selects the cut (and must NOT scrub the playhead).
     band.addEventListener('pointerdown', (ev) => {
       // If a handle was hit, let its own handler run (it stops propagation).
@@ -499,8 +559,19 @@ function renderSourceTimeline() {
     }
   }
   if (tlZoomHint) tlZoomHint.hidden = zoomed;
-  cutStats.textContent =
-    `kept ${fmtTime(clipKept(c))} / ${fmtTime(c.duration)} · ${c.cuts.length} cut${c.cuts.length === 1 ? '' : 's'}`;
+  // Cut-focused readout (the aggregate "kept" totals live in the strip header).
+  const removed = c.duration - clipKept(c);
+  const nCuts = c.cuts.length;
+  cutStats.textContent = nCuts
+    ? `${nCuts} cut${nCuts === 1 ? '' : 's'} · ${fmtTime(removed)} removed`
+    : 'no cuts yet';
+  // Flash the readout when the cut count changes (create/delete feedback).
+  if (cutStats._n !== undefined && cutStats._n !== nCuts) {
+    cutStats.classList.remove('flash');
+    void cutStats.offsetWidth; // restart the animation
+    cutStats.classList.add('flash');
+  }
+  cutStats._n = nCuts;
 }
 
 /* ---------- cut selection + resize ---------- */
@@ -889,9 +960,15 @@ function markEnd() {
   let s = activeClip.pendingStart, e = preview.currentTime;
   if (e < s) [s, e] = [e, s];
   let added = false;
-  if (e - s > 0.01) { activeClip.cuts.push([s, e]); added = true; }
+  if (e - s > 0.01) {
+    const cut = [s, e];
+    activeClip.cuts.push(cut);
+    _flashCut = cut; // one-shot create flash on next render
+    added = true;
+  }
   activeClip.pendingStart = null;
   renderSourceTimeline();
+  _flashCut = null;
   updateDeleteCutButton();
   updateTileMini(activeClip);
   updateCutButtons();
@@ -1483,19 +1560,34 @@ function showToast(cls) {
 function hideToast() {
   jobStatus.className = 'job-toast';
 }
+const jobRevealBtn = $('jobRevealBtn');
+const jobBarWrap = jobBar.parentElement;
 function setJobUi({ msg, pct, meta, phase }) {
-  if (msg != null) jobMsg.textContent = msg;
+  if (msg != null) jobMsg.innerHTML = msg;
   if (pct != null) jobBar.style.width = `${Math.max(0, Math.min(100, pct)).toFixed(1)}%`;
   if (meta != null) jobMeta.textContent = meta;
   if (phase === 'running') {
+    jobBarWrap.style.display = '';
     jobCancelBtn.hidden = false;
     jobDismissBtn.hidden = true;
+    jobRevealBtn.hidden = true;
   } else if (phase === 'done' || phase === 'error') {
+    // The progress bar is only meaningful while running.
+    jobBarWrap.style.display = 'none';
     jobCancelBtn.hidden = true;
     jobDismissBtn.hidden = false;
+    jobRevealBtn.hidden = (phase !== 'done');
   }
 }
 jobDismissBtn.onclick = hideToast;
+
+/* "Open folder" on a finished export reveals the file in the OS browser. */
+let lastOutputPath = null;
+jobRevealBtn.onclick = async () => {
+  if (!lastOutputPath) return;
+  try { await postJson('/api/reveal', { path: lastOutputPath }); }
+  catch (e) { alert('Could not open folder: ' + e.message); }
+};
 
 let currentJobId = null;
 jobCancelBtn.onclick = async () => {
@@ -1552,8 +1644,10 @@ function updateExportNote() {
   const accurate = accurateMode.checked;
   const res = resolutionSelect.value;
   const bits = [];
-  if (!accurate) {
-    bits.push('Fast mode: near-instant, but cuts snap to keyframes and clips of mixed formats force a re-encode.');
+  if (accurate) {
+    bits.push('Re-encodes for exact cuts — slower, but frame-accurate and perfectly in sync.');
+  } else {
+    bits.push('Fast: near-instant (no re-encode), but cuts snap to keyframes.');
   }
   if (res !== 'source' && !accurate) {
     bits.push('Resolution change requires re-encoding — Accurate will be used.');
@@ -1619,6 +1713,7 @@ loadExportSettings();
 async function runExport() {
   const out = buildOutputPath();
   if (!out) { alert('Choose an output folder.'); return; }
+  lastOutputPath = out;
 
   const payload = clips.map((c) => ({ path: c.path, keep: buildKeepRanges(c) }));
   if (payload.every((c) => c.keep.length === 0)) {
@@ -1665,16 +1760,20 @@ async function runExport() {
           throw new Error('Lost contact with server: ' + err.message);
         }
         setJobUi({
-          msg: lastMsg + ' (server busy, retrying...)',
+          msg: escHtml(lastMsg + ' (server busy, retrying...)'),
           phase: 'running',
         });
         continue;
       }
       if (s.status === 'done') {
+        const full = s.output || lastOutputPath || '';
+        const fname = full.split(/[\\/]/).pop() || full;
+        const folder = full.slice(0, full.length - fname.length).replace(/[\\/]+$/, '');
         setJobUi({
-          msg: `Done · ${s.output}`,
+          msg: `<b>Export complete</b><span class="job-file" title="${escHtml(full)}">${escHtml(fname)}</span>`,
           pct: 100,
-          meta: s.encoder ? `encoder: ${s.encoder}` : '',
+          meta: [folder, s.encoder ? `encoder: ${s.encoder}` : '']
+            .filter(Boolean).join('  ·  '),
           phase: 'done',
         });
         showToast('ok');
@@ -1682,7 +1781,7 @@ async function runExport() {
       }
       if (s.status === 'error') {
         setJobUi({
-          msg: 'Export error: ' + (s.message || 'unknown'),
+          msg: escHtml('Export error: ' + (s.message || 'unknown')),
           pct: 0,
           meta: '',
           phase: 'error',
@@ -1692,7 +1791,7 @@ async function runExport() {
       }
       lastMsg = s.message || 'Working...';
       setJobUi({
-        msg: lastMsg,
+        msg: escHtml(lastMsg),
         pct: typeof s.progress === 'number' ? s.progress : undefined,
         meta: s.encoder ? `encoder: ${s.encoder}` : '',
         phase: 'running',
@@ -1700,7 +1799,7 @@ async function runExport() {
       showToast('run');
     }
   } catch (e) {
-    setJobUi({ msg: 'Error: ' + e.message, pct: 0, meta: '', phase: 'error' });
+    setJobUi({ msg: escHtml('Error: ' + e.message), pct: 0, meta: '', phase: 'error' });
     showToast('err');
   } finally {
     currentJobId = null;
