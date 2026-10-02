@@ -355,35 +355,38 @@ def source_keyframes(ffprobe: str, src: Path) -> list[float]:
 _ENCODER_CACHE: dict[str, bool] = {}
 
 
-def encoder_works(ffmpeg: str, name: str) -> bool:
+def encoder_works(ffmpeg: str, name: str, args: tuple[str, ...] = ()) -> bool:
     """Does this ffmpeg build actually have a working encoder of that name?
     Probes with a tiny null output — handles cases where the encoder is
     compiled in but no matching hardware is available (e.g. h264_qsv on a
-    machine without Intel iGPU)."""
-    if name in _ENCODER_CACHE:
-        return _ENCODER_CACHE[name]
+    machine without Intel iGPU). `args` are extra encoder options to probe
+    with, for options only some hardware supports (VideoToolbox -q:v)."""
+    key = " ".join((name, *args))
+    if key in _ENCODER_CACHE:
+        return _ENCODER_CACHE[key]
     try:
         proc = subprocess.run(
             [ffmpeg, "-hide_banner", "-loglevel", "error",
              "-f", "lavfi", "-i", "color=c=black:s=320x240:d=0.1",
-             "-c:v", name, "-f", "null", "-"],
+             "-c:v", name, *args, "-pix_fmt", "yuv420p", "-f", "null", "-"],
             capture_output=True, timeout=15,
             creationflags=SUBPROCESS_FLAGS,
         )
         ok = proc.returncode == 0
     except Exception:  # noqa: BLE001
         ok = False
-    _ENCODER_CACHE[name] = ok
+    _ENCODER_CACHE[key] = ok
     return ok
 
 
 # Quality presets → per-encoder rate-control value. Lower number = higher
 # quality / bigger file. "high" is near-visually-lossless; "small" trades some
 # detail for a much smaller file. Keys must match the frontend's <select>.
+# VideoToolbox ("vt") is the exception: its -q:v scale is 1–100, HIGHER = better.
 QUALITY_LEVELS = {
-    "high":     {"nvenc": 18, "qsv": 18, "amf": 18, "x264": 18},
-    "balanced": {"nvenc": 22, "qsv": 23, "amf": 23, "x264": 22},
-    "small":    {"nvenc": 27, "qsv": 28, "amf": 28, "x264": 27},
+    "high":     {"nvenc": 18, "qsv": 18, "amf": 18, "vt": 75, "x264": 18},
+    "balanced": {"nvenc": 22, "qsv": 23, "amf": 23, "vt": 62, "x264": 22},
+    "small":    {"nvenc": 27, "qsv": 28, "amf": 28, "vt": 50, "x264": 27},
 }
 
 
@@ -407,6 +410,13 @@ def pick_h264_encoder(ffmpeg: str, quality: str = "balanced") -> tuple[str, list
     if encoder_works(ffmpeg, "h264_amf"):
         return "h264_amf", ["-quality", "speed", "-rc", "cqp",
                             "-qp_p", str(q["amf"]), "-qp_i", str(q["amf"])]
+    if sys.platform == "darwin":
+        # Apple VideoToolbox (Media Engine on Apple Silicon). Constant-quality
+        # -q:v is only supported on Apple Silicon, so probe with it — Intel
+        # Macs fall through to libx264 rather than an unbounded bitrate.
+        vt_args = ["-q:v", str(q["vt"]), "-allow_sw", "0", "-realtime", "0"]
+        if encoder_works(ffmpeg, "h264_videotoolbox", tuple(vt_args)):
+            return "h264_videotoolbox", vt_args
     return "libx264", ["-preset", "ultrafast", "-crf", str(q["x264"])]
 
 
@@ -798,6 +808,9 @@ def run_accurate_export(
     elif enc_name == "h264_nvenc":
         # We set -no-scenecut in enc_args; -g/-keyint_min above give a fixed GOP.
         cmd += ["-forced-idr", "1"]
+    elif enc_name == "h264_videotoolbox":
+        # VideoToolbox ignores -keyint_min; cap the keyframe distance in time too.
+        cmd += ["-max_key_interval_duration", "2"]
     cmd += ["-c:v", enc_name, *enc_args, "-pix_fmt", "yuv420p",
             "-movflags", "+faststart", str(output)]
 
@@ -832,7 +845,7 @@ def run_export(job_id: str, payload: dict) -> None:
 
     Accurate path (payload['accurate'] == True): one ffmpeg process with a
     filter_complex trim+concat, re-encoding once with the best available
-    H.264 encoder (NVENC / QSV / AMF / libx264). Frame-accurate, slower.
+    H.264 encoder (NVENC / QSV / AMF / VideoToolbox / libx264). Frame-accurate, slower.
     """
     try:
         ffmpeg = find_ffmpeg()
