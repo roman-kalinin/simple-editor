@@ -1,6 +1,8 @@
 # Bundled binaries (huge, downloaded by build-installer.bat)
 ffmpeg.exe
 ffprobe.exe
+/ffmpeg
+/ffprobe
 
 # Build / packaging artifacts
 build/
