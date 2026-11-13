@@ -40,6 +40,12 @@ const btnCancelMark = $('btnCancelMark');
 const btnUndoCut = $('btnUndoCut');
 const btnDeleteCut = $('btnDeleteCut');
 const cutStats = $('cutStats');
+const btnFillers = $('btnFillers');
+const btnTranscript = $('btnTranscript');
+const transcriptPanel = $('transcriptPanel');
+const tpBody = $('tpBody');
+const tpMeta = $('tpMeta');
+const tpSummary = $('tpSummary');
 
 const clipStripEl = $('clipStrip');
 const stripTotals = $('stripTotals');
@@ -55,6 +61,7 @@ const pickFolderBtn = $('pickFolderBtn');
 const exportBtn = $('exportBtn');
 const accurateMode = $('accurateMode');
 const keepAudio = $('keepAudio');
+const smoothCuts = $('smoothCuts');
 const qualitySelect = $('qualitySelect');
 const resolutionSelect = $('resolutionSelect');
 const exportModal = $('exportModal');
@@ -78,6 +85,13 @@ const tileTpl = $('clipTileTemplate');
 const clips = []; // {id, name, path, duration, cuts, pendingStart, tile}
 let activeClip = null;
 let previewSeekable = false;
+/* transcript side panel state (see 'transcript side panel' below) */
+const FILLER_EPS = 0.005;
+let transcriptOpen = false;
+let tpWordEls = [];    // element per word index
+let tpFillerEls = [];  // chip per filler index
+let tpNowIdx = -1;
+let currentJobId = null; // running export / filler-detection job (shares the toast)
 
 /* ---------- undo/redo history + autosave ----------
  *
@@ -191,6 +205,7 @@ function saveSession() {
         path: c.path,
         duration: c.duration,
         cuts: c.cuts.map(([s, e]) => [s, e]),
+        transcript: c.transcript || null,
       })),
       activeId: activeClip ? activeClip.id : null,
     };
@@ -313,6 +328,7 @@ function setActive(clip) {
     renderSourceTimeline();
     updateDeleteCutButton();
     updateCutButtons();
+    renderTranscript();
     return;
   }
   preview.classList.remove('hidden');
@@ -326,6 +342,7 @@ function setActive(clip) {
   renderSourceTimeline();
   updateDeleteCutButton();
   updateCutButtons();
+  renderTranscript();
 }
 
 function updateCutButtons() {
@@ -333,6 +350,7 @@ function updateCutButtons() {
   btnMarkStart.disabled = !has || !previewSeekable;
   btnMarkEnd.disabled = !has || activeClip?.pendingStart == null;
   btnCancelMark.disabled = !has || activeClip?.pendingStart == null;
+  if (btnFillers) btnFillers.disabled = !has || !!currentJobId || !!activeClip?.missing;
   // Undo/redo buttons are driven by the history stack, not the current clip.
   updateHistoryButtons();
 }
@@ -581,6 +599,7 @@ function renderSourceTimeline() {
     cutStats.classList.add('flash');
   }
   cutStats._n = nCuts;
+  updateTranscriptCuts();
 }
 
 /* ---------- cut selection + resize ---------- */
@@ -777,6 +796,7 @@ preview.addEventListener('timeupdate', () => {
   tlPlayhead.style.left = `${pct}%`;
   tlNow.textContent = fmtTime(preview.currentTime);
   updateDeleteCutButton();
+  highlightTranscriptWord(preview.currentTime);
 });
 preview.addEventListener('seeked', updateDeleteCutButton);
 
@@ -1113,6 +1133,7 @@ function addClip(info, restore) {
     path: info.path,
     duration: restore && restore.duration ? restore.duration : 0,
     cuts: restore && Array.isArray(restore.cuts) ? restore.cuts.map(([s, e]) => [s, e]) : [],
+    transcript: restore && restore.transcript ? restore.transcript : null,
     pendingStart: null,
     tile,
   };
@@ -1598,7 +1619,6 @@ jobRevealBtn.onclick = async () => {
   catch (e) { alert('Could not open folder: ' + e.message); }
 };
 
-let currentJobId = null;
 jobCancelBtn.onclick = async () => {
   if (!currentJobId) return;
   jobCancelBtn.disabled = true;
@@ -1634,7 +1654,7 @@ function openExportModal() {
   // a changed resolution / disabled toggle is never hidden from the user.
   if (moreOptions) {
     const advanced = resolutionSelect.value !== 'source'
-      || !accurateMode.checked || !keepAudio.checked;
+      || !accurateMode.checked || !keepAudio.checked || !smoothCuts.checked;
     moreOptions.open = advanced;
   }
   exportModal.hidden = false;
@@ -1671,6 +1691,10 @@ function updateExportNote() {
     bits.push('Resolution change requires re-encoding — Accurate will be used.');
     warn = true;
   }
+  // Smooth cuts only exists in the re-encode path, and only matters with audio.
+  const reencode = accurate || res !== 'source';
+  smoothCuts.disabled = !reencode || !keepAudio.checked;
+  smoothCuts.closest('label').classList.toggle('is-disabled', smoothCuts.disabled);
   exportModalNote.textContent = bits.join(' ');
   exportModalNote.classList.toggle('warn', warn);
   // Live destination summary so the user sees where the file lands.
@@ -1678,6 +1702,7 @@ function updateExportNote() {
   exportDest.textContent = out ? `→ ${out}` : 'Choose a folder to save to.';
 }
 accurateMode.addEventListener('change', updateExportNote);
+keepAudio.addEventListener('change', updateExportNote);
 resolutionSelect.addEventListener('change', updateExportNote);
 outputDir.addEventListener('input', updateExportNote);
 outputName.addEventListener('input', updateExportNote);
@@ -1712,6 +1737,7 @@ function saveExportSettings() {
       resolution: resolutionSelect.value,
       accurate: accurateMode.checked,
       keepAudio: keepAudio.checked,
+      smoothCuts: smoothCuts.checked,
     }));
   } catch (_) {}
 }
@@ -1723,9 +1749,10 @@ function loadExportSettings() {
     if (s.resolution) resolutionSelect.value = s.resolution;
     if (typeof s.accurate === 'boolean') accurateMode.checked = s.accurate;
     if (typeof s.keepAudio === 'boolean') keepAudio.checked = s.keepAudio;
+    if (typeof s.smoothCuts === 'boolean') smoothCuts.checked = s.smoothCuts;
   } catch (_) {}
 }
-for (const el of [qualitySelect, resolutionSelect, accurateMode, keepAudio]) {
+for (const el of [qualitySelect, resolutionSelect, accurateMode, keepAudio, smoothCuts]) {
   el.addEventListener('change', saveExportSettings);
 }
 loadExportSettings();
@@ -1742,6 +1769,7 @@ async function runExport() {
   }
 
   exportBtn.disabled = true;
+  if (btnFillers) btnFillers.disabled = true;
   jobCancelBtn.disabled = false;
   setJobUi({ msg: 'Submitting export...', pct: 0, meta: '', phase: 'running' });
   showToast('run');
@@ -1752,6 +1780,7 @@ async function runExport() {
       output: out,
       accurate: !!accurateMode.checked,
       keep_audio: !!keepAudio.checked,
+      smooth_cuts: !!smoothCuts.checked,
       quality: qualitySelect.value,
       resolution: resolutionSelect.value,
     });
@@ -1824,8 +1853,302 @@ async function runExport() {
   } finally {
     currentJobId = null;
     exportBtn.disabled = false;
+    updateCutButtons();
   }
 }
+
+/* ---------- filler-word removal (Whisper) ----------
+ * Sends the active clip to /api/fillers, which transcribes it with
+ * faster-whisper and returns [start, end] ranges around each "um"/"uh"/etc.
+ * Those become ordinary cuts (one undo step), so the user can review, resize,
+ * delete or Ctrl+Z them. Shares the job toast + cancel button with export. */
+async function runFillerDetection(force) {
+  const clip = activeClip;
+  if (!clip || currentJobId) return;
+  // Already analysed: just bring the transcript back. "Re-run" in the panel
+  // forces a fresh pass.
+  if (clip.transcript && force !== true) {
+    openTranscript();
+    renderTranscript();
+    return;
+  }
+  btnFillers.disabled = true;
+  exportBtn.disabled = true;
+  jobCancelBtn.disabled = false;
+  setJobUi({ msg: escHtml('Starting filler-word detection...'), pct: 0, meta: clip.name, phase: 'running' });
+  showToast('run');
+  try {
+    const { id } = await postJson('/api/fillers', { path: clip.path, duration: clip.duration });
+    currentJobId = id;
+    let failures = 0;
+    while (true) {
+      await new Promise((r) => setTimeout(r, failures ? 2000 : 700));
+      let s;
+      try {
+        const resp = await fetch('/api/job/' + id);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        s = await resp.json();
+        failures = 0;
+      } catch (err) {
+        if (++failures >= 30) throw new Error('Lost contact with server: ' + err.message);
+        continue;
+      }
+      if (s.status === 'error') throw new Error(s.message || 'unknown error');
+      if (s.status === 'done') {
+        applyFillerRanges(clip, s);
+        break;
+      }
+      setJobUi({
+        msg: escHtml(s.message || 'Working...'),
+        pct: typeof s.progress === 'number' ? s.progress : undefined,
+        meta: clip.name,
+        phase: 'running',
+      });
+    }
+  } catch (e) {
+    setJobUi({ msg: escHtml('Filler detection: ' + e.message), pct: 0, meta: '', phase: 'error' });
+    showToast('err');
+  } finally {
+    currentJobId = null;
+    exportBtn.disabled = false;
+    updateCutButtons();
+  }
+}
+
+function applyFillerRanges(clip, result) {
+  if (!clips.includes(clip)) return; // clip was removed while we were listening
+  // Re-run: drop the cuts the previous pass made (exact matches only, so the
+  // user's own cuts survive), then apply the new set.
+  if (clip.transcript) {
+    const old = clip.transcript.fillers || [];
+    clip.cuts = clip.cuts.filter(([s, e]) => !old.some(
+      (f) => Math.abs(s - f.cs) < FILLER_EPS && Math.abs(e - f.ce) < FILLER_EPS));
+  }
+  clip.transcript = {
+    words: result.words || [],
+    fillers: result.fillers || [],
+    language: result.language || '',
+    model: result.model || '',
+  };
+  let added = 0, secs = 0;
+  for (const f of clip.transcript.fillers) {
+    if (fillerIsCut(clip, f)) continue;
+    clip.cuts.push([f.cs, f.ce]);
+    added++;
+    secs += f.ce - f.cs;
+  }
+  transcriptOpen = true;
+  if (clip !== activeClip) setActive(clip);
+  else { renderSourceTimeline(); updateDeleteCutButton(); renderTranscript(); }
+  updateTileMini(clip);
+  updateTotals();
+  pushHistory(); // one undo step for the whole pass (also persists the transcript)
+
+  const n = clip.transcript.fillers.length;
+  const nSound = clip.transcript.fillers.filter((f) => f.kind === 'sound').length;
+  setJobUi({
+    msg: n
+      ? `<b>Found ${n} filler${n === 1 ? '' : 's'}</b>${added} cut, ${secs.toFixed(1)}s in total. Review them in the transcript.`
+      : '<b>No fillers found</b>The transcript is in the side panel.',
+    pct: 100,
+    meta: [
+      n ? `${n - nSound} filler word${n - nSound === 1 ? "" : "s"} · ${nSound} held sound${nSound === 1 ? '' : 's'}` : '',
+      `${(result.words || []).length} words`,
+      result.language ? `lang: ${result.language}` : '',
+      result.model ? `Whisper ${result.model}` : '',
+    ].filter(Boolean).join('  ·  '),
+    phase: 'done',
+  });
+  jobRevealBtn.hidden = true; // nothing to reveal for this job
+  showToast('ok');
+}
+
+/* ---------- transcript side panel ----------
+ * Shows the clip's Whisper transcript. Words seek the preview. Fillers are
+ * chips: click the chip to hear it in context (playback starts ~1.5s before;
+ * with "skip cuts on play" on you hear the edited result), click its toggle
+ * to keep/remove it. A filler counts as removed when any cut fully covers it,
+ * so the panel stays in sync with undo, manual cut edits, etc. */
+
+function fillerIsCut(clip, f) {
+  return clip.cuts.some(([s, e]) => s <= f.cs + FILLER_EPS && e >= f.ce - FILLER_EPS);
+}
+function openTranscript() {
+  transcriptOpen = true;
+  transcriptPanel.hidden = !(activeClip && activeClip.transcript);
+}
+function closeTranscript() {
+  transcriptOpen = false;
+  transcriptPanel.hidden = true;
+}
+$('tpClose').onclick = closeTranscript;
+btnTranscript.onclick = () => (transcriptPanel.hidden ? openTranscript() : closeTranscript());
+
+function playFrom(t) {
+  if (!activeClip || !previewSeekable) return;
+  preview.currentTime = Math.max(0, t);
+  preview.play().catch(() => {});
+}
+
+function renderTranscript() {
+  const c = activeClip;
+  const tr = c && c.transcript;
+  btnTranscript.hidden = !tr;
+  tpWordEls = [];
+  tpFillerEls = [];
+  tpNowIdx = -1;
+  if (!tr) { transcriptPanel.hidden = true; tpBody.innerHTML = ''; return; }
+  transcriptPanel.hidden = !transcriptOpen;
+  tpMeta.textContent = [tr.language, tr.model].filter(Boolean).join(' · ');
+
+  const fillerByWord = new Map();
+  tr.fillers.forEach((f, i) => { if (f.kind === 'word') fillerByWord.set(f.wi, i); });
+  // Interleave words and held-sound chips by time.
+  const tokens = tr.words.map((w, i) => ({ t: w[0], word: i }));
+  tr.fillers.forEach((f, i) => { if (f.kind === 'sound') tokens.push({ t: f.s + 1e-4, sound: i }); });
+  tokens.sort((a, b) => a.t - b.t);
+
+  const frag = document.createDocumentFragment();
+  for (const tok of tokens) {
+    const el = document.createElement('span');
+    if (tok.sound != null || fillerByWord.has(tok.word)) {
+      const fi = tok.sound != null ? tok.sound : fillerByWord.get(tok.word);
+      const f = tr.fillers[fi];
+      el.className = f.kind === 'sound' ? 'tf-sound' : 'tw filler';
+      const label = f.kind === 'sound' ? `held sound ${(f.e - f.s).toFixed(1)}s` : f.label;
+      el.innerHTML = `<span class="tf-label">${escHtml(label)}</span>` +
+        '<span class="tf-toggle" role="button"><svg class="icon"><use href="#i-x"/></svg></span>';
+      el.dataset.fi = fi;
+      tpFillerEls[fi] = el;
+      if (tok.word != null) tpWordEls[tok.word] = el;
+    } else {
+      el.className = 'tw';
+      el.textContent = tr.words[tok.word][2];
+      el.dataset.wi = tok.word;
+      tpWordEls[tok.word] = el;
+    }
+    frag.appendChild(el);
+    frag.appendChild(document.createTextNode(' '));
+  }
+  tpBody.innerHTML = '';
+  if (!tokens.length) tpBody.textContent = 'No speech detected.';
+  tpBody.appendChild(frag);
+  updateTranscriptCuts();
+}
+
+/* Cheap refresh: re-derive removed/kept state from the clip's cuts. */
+function updateTranscriptCuts() {
+  const c = activeClip;
+  const tr = c && c.transcript;
+  if (!tr || !tpBody.childElementCount) return;
+  let nCut = 0, secs = 0;
+  tr.fillers.forEach((f, i) => {
+    const el = tpFillerEls[i];
+    const cut = fillerIsCut(c, f);
+    if (cut) { nCut++; secs += f.ce - f.cs; }
+    if (!el) return;
+    el.classList.toggle('is-cut', cut);
+    el.title = `${fmtTime(f.s)} · ${f.kind === 'sound'
+      ? 'Held sound (eeee / mmmm) that Whisper did not write down'
+      : 'Filler word'} · click to listen · toggle to ${cut ? 'keep' : 'remove'} it`;
+    const use = el.querySelector('.tf-toggle use');
+    if (use) use.setAttribute('href', cut ? '#i-undo' : '#i-scissors');
+  });
+  // Grey out ordinary words inside the user's own cuts. Filler cuts are
+  // skipped: Whisper stretches word timestamps over hesitations, so a word
+  // can "overlap" a filler cut without actually being cut.
+  const ownCuts = c.cuts.filter(([s, e]) => !tr.fillers.some(
+    (f) => Math.abs(s - f.cs) < FILLER_EPS && Math.abs(e - f.ce) < FILLER_EPS));
+  tr.words.forEach((w, i) => {
+    const el = tpWordEls[i];
+    if (!el || el.dataset.fi) return;
+    const mid = (w[0] + w[1]) / 2;
+    el.classList.toggle('in-cut', ownCuts.some(([s, e]) => s <= mid && e >= mid));
+  });
+  const n = tr.fillers.length;
+  tpSummary.textContent = n
+    ? `${nCut} of ${n} filler${n === 1 ? '' : 's'} removed · ${secs.toFixed(1)}s`
+    : 'No fillers found';
+}
+
+function setFillerCut(clip, f, wantCut) {
+  if (wantCut === fillerIsCut(clip, f)) return false;
+  if (wantCut) {
+    clip.cuts.push([f.cs, f.ce]);
+    return true;
+  }
+  // Remove the filler's own cut. A larger, user-made cut that also covers it
+  // is left alone rather than silently destroyed.
+  const before = clip.cuts.length;
+  clip.cuts = clip.cuts.filter(([s, e]) => !(Math.abs(s - f.cs) < FILLER_EPS && Math.abs(e - f.ce) < FILLER_EPS));
+  return clip.cuts.length !== before;
+}
+
+function afterFillerEdit() {
+  selectedCut = null;
+  renderSourceTimeline();
+  updateDeleteCutButton();
+  updateTileMini(activeClip);
+  updateTotals();
+  pushHistory();
+}
+
+tpBody.addEventListener('click', (e) => {
+  const c = activeClip;
+  if (!c || !c.transcript) return;
+  const chip = e.target.closest('[data-fi]');
+  if (chip) {
+    const f = c.transcript.fillers[+chip.dataset.fi];
+    if (e.target.closest('.tf-toggle')) {
+      const want = !fillerIsCut(c, f);
+      if (setFillerCut(c, f, want)) afterFillerEdit();
+      else if (!want) {
+        chip.classList.remove('flash'); void chip.offsetWidth; chip.classList.add('flash');
+        chip.title = 'This filler is inside a bigger cut you made — delete that cut on the timeline to keep it.';
+      }
+      return;
+    }
+    playFrom(f.s - 1.5);
+    return;
+  }
+  const w = e.target.closest('[data-wi]');
+  if (w) preview.currentTime = c.transcript.words[+w.dataset.wi][0];
+});
+
+function bulkFillers(wantCut) {
+  const c = activeClip;
+  if (!c || !c.transcript) return;
+  let changed = false;
+  for (const f of c.transcript.fillers) changed = setFillerCut(c, f, wantCut) || changed;
+  if (changed) afterFillerEdit();
+}
+$('tpCutAll').onclick = () => bulkFillers(true);
+$('tpKeepAll').onclick = () => bulkFillers(false);
+
+/* Highlight the word under the playhead and keep it scrolled into view. */
+function highlightTranscriptWord(t) {
+  const tr = activeClip && activeClip.transcript;
+  if (!tr || transcriptPanel.hidden || !tr.words.length) return;
+  let lo = 0, hi = tr.words.length - 1, idx = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (tr.words[mid][0] <= t) { idx = mid; lo = mid + 1; } else hi = mid - 1;
+  }
+  if (idx >= 0 && t > tr.words[idx][1] + 0.3) idx = -1;
+  if (idx === tpNowIdx) return;
+  if (tpNowIdx >= 0 && tpWordEls[tpNowIdx]) tpWordEls[tpNowIdx].classList.remove('now');
+  tpNowIdx = idx;
+  const el = idx >= 0 ? tpWordEls[idx] : null;
+  if (el) {
+    el.classList.add('now');
+    const box = tpBody.getBoundingClientRect(), r = el.getBoundingClientRect();
+    if (r.top < box.top + 20 || r.bottom > box.bottom - 20) {
+      tpBody.scrollTop += r.top - box.top - box.height / 3;
+    }
+  }
+}
+if (btnFillers) btnFillers.onclick = () => runFillerDetection(false);
+$('tpRerun').onclick = () => runFillerDetection(true);
 
 /* ---------- missing-file watcher ----------
  * Every 3s, ask the server which registered ids still resolve to real files
@@ -1888,7 +2211,7 @@ async function restoreSession() {
     for (const sc of saved.clips) {
       try {
         const info = await postJson('/api/register', { path: sc.path });
-        const clip = addClip(info, { cuts: sc.cuts, duration: sc.duration });
+        const clip = addClip(info, { cuts: sc.cuts, duration: sc.duration, transcript: sc.transcript });
         if (saved.activeId && sc.id === saved.activeId) activeTarget = clip;
       } catch (e) {
         failures.push(`${sc.name || sc.path} — ${e.message}`);

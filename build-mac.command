@@ -91,8 +91,10 @@ fi
 ./ffprobe -version >/dev/null 2>&1 || { echo "ERROR: ffprobe binary does not run on this Mac."; exit 1; }
 
 # ---- 3. PyInstaller. ----
-echo "[3/5] Installing PyInstaller + pywebview..."
-python3 -m pip install --upgrade --quiet pip pyinstaller pywebview
+echo "[3/5] Installing PyInstaller + pywebview + faster-whisper..."
+# pywebview pulls in its pyobjc Cocoa/WebKit deps on macOS. faster-whisper: "Remove
+# fillers" (runs on CPU on Macs; the speech model downloads on first use).
+python3 -m pip install --upgrade --quiet pip pyinstaller pywebview faster-whisper
 
 # ---- 4. Build the .app. ----
 echo "[4/5] Running PyInstaller..."

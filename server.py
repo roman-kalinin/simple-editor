@@ -695,6 +695,10 @@ def _q(path: Path) -> str:
     return str(path)
 
 
+# Length of each audio fade at a cut when "Smooth cuts" is on (seconds).
+SMOOTH_FADE = 0.02
+
+
 def run_accurate_export(
     job_id: str,
     ffmpeg: str,
@@ -707,6 +711,7 @@ def run_accurate_export(
     target_fps: float,
     total_output_seconds: float,
     quality: str = "balanced",
+    smooth_cuts: bool = False,
 ) -> None:
     """Frame-accurate export in a SINGLE ffmpeg process.
 
@@ -720,10 +725,16 @@ def run_accurate_export(
     common WxH/fps so clips of different formats concat cleanly. Audio is
     resampled to 48 kHz stereo; ranges from sources with no audio get generated
     silence so the audio track stays aligned with the video.
+
+    smooth_cuts: every join gets a short audio fade-out / fade-in (SMOOTH_FADE
+    each side) so cuts don't click or jump in room tone. Fades don't change any
+    durations, so A/V sync is untouched (unlike acrossfade, which overlaps and
+    shortens the audio).
     """
     enc_name, enc_args = pick_h264_encoder(ffmpeg, quality)
     JOBS[job_id]["encoder"] = enc_name
     dlog(f"ACCURATE(single-pass)  encoder={enc_name}  quality={quality}  keep_audio={keep_audio}  "
+         f"smooth_cuts={smooth_cuts}  "
          f"ranges={len(ranges)}  target={target_w}x{target_h}@{target_fps:.3f}", job_id)
 
     # Deduplicate sources into input slots; reuse a source across ranges.
@@ -769,8 +780,15 @@ def run_accurate_export(
         if keep_audio:
             alab = f"a{i}"
             if source_has_audio.get(str(src.resolve()), False):
+                fades = ""
+                dur = e - s
+                if smooth_cuts and dur > 4 * SMOOTH_FADE:
+                    if i > 0:  # join with the previous range
+                        fades += f",afade=t=in:st=0:d={SMOOTH_FADE}"
+                    if i < len(ranges) - 1:  # join with the next range
+                        fades += f",afade=t=out:st={dur - SMOOTH_FADE:.4f}:d={SMOOTH_FADE}"
                 parts.append(
-                    f"[{idx}:a]atrim=start={s:.3f}:end={e:.3f},asetpts=PTS-STARTPTS,"
+                    f"[{idx}:a]atrim=start={s:.3f}:end={e:.3f},asetpts=PTS-STARTPTS{fades},"
                     f"aresample=48000:async=1,aformat=sample_fmts=fltp:channel_layouts=stereo[{alab}]"
                 )
             else:
@@ -833,6 +851,48 @@ def run_accurate_export(
                 f"Free up space and retry."
             )
         raise RuntimeError(f"Accurate export failed:\n{stderr}")
+
+
+def run_fillers(job_id: str, src: Path, duration: float) -> None:
+    """Background job: find filler words in `src` with Whisper (see fillers.py)."""
+    job = JOBS[job_id]
+
+    def report(msg: str, pct: float) -> None:
+        job["message"] = msg
+        job["progress"] = pct
+
+    try:
+        try:
+            import fillers
+        except ImportError as e:
+            raise RuntimeError(
+                "Filler removal needs faster-whisper. Install it with "
+                "`pip install faster-whisper` and restart the app. "
+                f"({e})"
+            ) from e
+        ffmpeg = find_ffmpeg()
+        if not ffmpeg:
+            raise RuntimeError("ffmpeg not found.")
+        dlog(f"fillers: start {src}", job_id)
+        result = fillers.detect_fillers(
+            ffmpeg, src, WORK_DIR, duration, report,
+            lambda: bool(job.get("cancel")), SUBPROCESS_FLAGS,
+        )
+        dlog(
+            f"fillers: {len(result['fillers'])} fillers / {len(result['words'])} words "
+            f"lang={result['language']} ({result['model']})",
+            job_id,
+        )
+        job.update(result)
+        job["status"] = "done"
+    except Exception as e:  # noqa: BLE001
+        if job.get("cancel"):
+            job["status"] = "error"
+            job["message"] = "Cancelled"
+        else:
+            dlog(f"fillers: error {e!r}", job_id)
+            job["status"] = "error"
+            job["message"] = str(e)
 
 
 def run_export(job_id: str, payload: dict) -> None:
@@ -994,6 +1054,7 @@ def run_export(job_id: str, payload: dict) -> None:
                 job_id, ffmpeg, ranges, output, keep_audio,
                 source_has_audio, target_w, target_h, target_fps,
                 total_output_seconds, quality,
+                smooth_cuts=bool(payload.get("smooth_cuts", False)),
             )
         else:
             # ---------- FAST: stream-copy segments + concat-copy ----------
@@ -1362,6 +1423,20 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 t.start()
                 return self._send_json({"id": jid})
+            if path == "/api/fillers":
+                body = self._read_json()
+                src = Path(body.get("path", "")).resolve()
+                if not src.is_file():
+                    return self._send_json({"error": f"Not a file: {src}"}, 400)
+                jid = uuid.uuid4().hex
+                JOBS[jid] = {"status": "running", "message": "Starting...", "progress": 0.0}
+                t = threading.Thread(
+                    target=run_fillers,
+                    args=(jid, src, float(body.get("duration") or 0)),
+                    daemon=True,
+                )
+                t.start()
+                return self._send_json({"id": jid})
             if path.startswith("/api/job/") and path.endswith("/cancel"):
                 jid = path[len("/api/job/"):-len("/cancel")]
                 job = JOBS.get(jid)
@@ -1603,6 +1678,13 @@ def _safe_print(*args, **kwargs):
         pass
 
 
+class _ExclusiveHTTPServer(ThreadingHTTPServer):
+    """On Windows, SO_REUSEADDR (Python's default for HTTPServer) lets a second
+    instance bind the SAME port as a running one, and requests then go to
+    whichever wins. Disable it there so a busy port falls through to the next."""
+    allow_reuse_address = sys.platform != "win32"
+
+
 def start_server(port: int = 8765):
     """Create and bind the HTTP server. Returns (server, url).
 
@@ -1614,7 +1696,7 @@ def start_server(port: int = 8765):
     last_err = None
     for p in range(port, port + 10):
         try:
-            server = ThreadingHTTPServer(("127.0.0.1", p), Handler)
+            server = _ExclusiveHTTPServer(("127.0.0.1", p), Handler)
             url = f"http://127.0.0.1:{p}/"
             _safe_print(f"Simple video editor running at {url}  (build {SERVER_BUILD})")
             _safe_print(f"Debug log: {DEBUG_LOG}")

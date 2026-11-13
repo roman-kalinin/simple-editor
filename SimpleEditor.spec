@@ -46,6 +46,27 @@ if not binaries:
     print("[spec] WARNING: no bundled ffmpeg/ffprobe found — "
           "the built app will rely on the user's PATH.")
 
+# Filler-word removal (fillers.py) needs faster-whisper and its native deps.
+# Bundled on macOS by default (build-mac.command installs it). On Windows it's
+# opt-in via SIMPLEEDITOR_BUNDLE_WHISPER=1 to keep the installer small; without
+# it the app still runs and the "Remove fillers" button explains what's missing.
+import os
+hiddenimports_whisper = []
+if is_macos or os.environ.get("SIMPLEEDITOR_BUNDLE_WHISPER") == "1":
+    try:
+        from PyInstaller.utils.hooks import collect_all
+        for pkg in ("faster_whisper", "ctranslate2", "tokenizers", "av", "huggingface_hub"):
+            try:
+                d, b, h = collect_all(pkg)
+                datas += d
+                binaries += b
+                hiddenimports_whisper += h
+            except Exception as e:  # noqa: BLE001
+                print(f"[spec] WARNING: could not collect {pkg}: {e}")
+        hiddenimports_whisper += ["fillers", "numpy"]
+    except Exception as e:  # noqa: BLE001
+        print(f"[spec] WARNING: whisper bundling skipped: {e}")
+
 # Entry point: desktop.py opens a native window (pywebview/WebView2) and starts
 # the bundled server in-process. It imports server.py, so the backend is
 # included automatically.
@@ -60,6 +81,7 @@ a = Analysis(
         "webview.platforms.winforms",
         "clr_loader",
         "pythonnet",
+        *hiddenimports_whisper,
     ],
     hookspath=[],
     hooksconfig={},

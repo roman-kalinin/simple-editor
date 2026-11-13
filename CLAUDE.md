@@ -45,6 +45,26 @@ verified on a real Mac** — if you're on a Mac, that's likely your job.
 - **Missing:** no `.icns` app icon (`BUNDLE(icon=None)` in the spec). `make_icon.py`
   makes `app.ico`/`favicon.png`; convert with `sips`/`iconutil` if wanted.
 
+- **Filler removal (`fillers.py`):** needs `faster-whisper`. On Mac it runs
+  Whisper `small` on the CPU (CTranslate2 has no Metal backend); the model
+  downloads from Hugging Face on first click. Verify: run "Remove fillers" on a
+  talking clip from source, then in the built .app. The spec bundles
+  faster_whisper / ctranslate2 / tokenizers / av / huggingface_hub via
+  `collect_all` on macOS; if the .app fails with an import error, that list is
+  the place to fix. Set `SIMPLEEDITOR_WHISPER_DEVICE=cpu` on a GPU machine to
+  test the CPU path.
+
+## Filler detection — how it works
+
+`/api/fillers` → `run_fillers()` → `fillers.detect_fillers()` returns words +
+fillers, each with `cs`/`ce` (the cut range). The front end (`applyFillerRanges`
+and the transcript panel in app.js) adds them as ordinary cuts; a filler counts
+as "removed" when any cut covers it, so undo and manual edits stay in sync.
+Held-sound detector (`held_sounds`): steady voiced spectrum for 0.30 s+, or
+0.15 s+ next to a pause; grown out over onset/decay; the cut reaches into
+adjacent silence for a clean join. Tuning constants are at the top of
+`fillers.py`.
+
 ## Testing
 
 - Syntax: `node --check app.js`, `python3 -c "import ast;ast.parse(open('server.py').read())"`.
@@ -57,5 +77,7 @@ verified on a real Mac** — if you're on a Mac, that's likely your job.
   (`run_accurate_export`). Never concat separately-encoded segments with `-c copy`
   when audio is kept — it drifts A/V out of sync.
 - Keep the fixed ~2s GOP in accurate export (fast seeking in players).
+- "Smooth cuts" uses per-segment `afade` in/out at joins (no `acrossfade`:
+  that overlaps audio and would shorten it relative to the video).
 - Don't break the Windows path (`build-installer.bat`, `installer.iss`) while
   fixing Mac issues; guard platform-specific code with `sys.platform`.
