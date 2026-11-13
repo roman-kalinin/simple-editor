@@ -2,6 +2,19 @@
 
 Editor for concatenating MP4s, cutting unwanted segments, muting, and exporting to MP4. Uses a tiny local Python server (stdlib only) + `ffmpeg`. Runs either in your browser (dev) or as a **standalone Windows app** in its own window.
 
+## Quick start on a Mac
+
+Not yet verified on a real Mac — feedback welcome.
+
+```bash
+brew install ffmpeg python
+python3 -m pip install pywebview faster-whisper
+python3 desktop.py        # native window (or: python3 server.py for a browser tab)
+```
+
+To build a double-clickable app: run `./build-mac.command` → `dist/SimpleEditor.app` + `dist/SimpleEditor.dmg`
+(unsigned: first launch with right-click → Open). See `CLAUDE.md` for details.
+
 ## Install as a Windows app (recommended)
 
 Double-click **`build-installer.bat`**. It downloads ffmpeg, builds a self-contained app, and produces:
@@ -59,6 +72,31 @@ Your session **autosaves**: clips and cuts are remembered, so if you close or re
    - **Keep audio** (on by default) — includes the original audio (off = silent video).
    - Your choices are remembered for next time.
 6. Click **Export ▸** in the dialog to start. Progress appears in the toast at the bottom.
+
+## Remove filler words (Whisper)
+
+Click **Remove fillers** under the timeline. The clip is transcribed locally with
+[faster-whisper](https://github.com/SYSTRAN/faster-whisper) and every hesitation
+becomes a normal cut, so you can review, resize or Ctrl+Z it like any other cut.
+
+- **Two detectors.** Words Whisper writes down that are pure hesitations
+  (um, uh, er, hmm; э, ем, ммм in Russian/Ukrainian), plus an acoustic detector
+  for *held sounds* ("eeee", "mmmm"). Whisper usually drops those from the text
+  and stretches the neighbouring word over them, so they're found by listening
+  for a steady, unchanging voiced sound instead. Real words ("like", "там", "ну")
+  are never removed automatically.
+- **Transcript panel.** Shows the full transcript with each filler highlighted.
+  Click a filler to hear it in context, its arrow to keep/remove it, any word to
+  jump there. *Remove all / Keep all* in the header; *Re-run* redoes the pass
+  (your own cuts are kept).
+- **Speed.** NVIDIA GPU: Whisper large-v3 (a 2.5 min clip takes ~15 s). Otherwise
+  (including Macs): Whisper small on the CPU. The model downloads on first use.
+- Needs `pip install faster-whisper`. Without it the rest of the editor works and
+  the button explains what's missing.
+
+**Smooth cuts** (export → More options, on by default): a 20 ms audio fade at
+every join so cuts don't click or jump in background noise. Timing is unchanged,
+so audio stays in sync.
 
 ## How the export works
 

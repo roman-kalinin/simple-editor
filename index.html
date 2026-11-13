@@ -32,6 +32,7 @@
   <symbol id="i-external" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></symbol>
   <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></symbol>
 </svg>
 <header>
@@ -98,6 +99,10 @@
             <label class="check-row" title="Keep the original audio. Off = silent output.">
               <input type="checkbox" id="keepAudio" checked>
               <span><strong>Keep audio</strong><small>Off = silent video</small></span>
+            </label>
+            <label class="check-row" title="Adds a 20 ms audio fade out/in at every cut so joins don't click or jump in background noise. Doesn't change timing — audio stays in sync. Needs Accurate cuts.">
+              <input type="checkbox" id="smoothCuts" checked>
+              <span><strong>Smooth cuts</strong><small>Tiny audio fades at every cut, no clicks</small></span>
             </label>
           </div>
         </div>
@@ -224,10 +229,32 @@
         <button id="btnUndoCut" class="ghost icon-only" title="Undo (Ctrl+Z)" aria-label="Undo" disabled><svg class="icon"><use href="#i-undo"/></svg></button>
         <button id="btnRedo" class="ghost icon-only" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled><svg class="icon"><use href="#i-redo"/></svg></button>
       </div>
+      <button id="btnFillers" title="Listen to this clip with Whisper and cut out filler words (um, uh, er, hmm). Each one becomes a normal cut you can review, resize or undo." disabled><svg class="icon"><use href="#i-mic"/></svg>Remove fillers</button>
+      <button id="btnTranscript" class="ghost" title="Show the transcript and the filler words that were found" hidden><svg class="icon"><use href="#i-file"/></svg>Transcript</button>
       <button id="btnDeleteCut" class="delete-cut" title="Delete the cut under the playhead" hidden><svg class="icon"><use href="#i-trash"/></svg>Delete cut</button>
       <div class="cut-stats" id="cutStats"></div>
     </div>
   </section>
+
+  <!-- Transcript side panel: filled by "Remove fillers" (Whisper). Every word
+       seeks the preview; every detected filler can be listened to and toggled. -->
+  <aside class="transcript-panel" id="transcriptPanel" hidden>
+    <div class="tp-head">
+      <strong>Transcript</strong>
+      <span class="tp-meta" id="tpMeta"></span>
+      <button type="button" id="tpRerun" class="ghost" title="Run filler detection again (replaces the fillers found last time; your own cuts are kept)"><svg class="icon"><use href="#i-redo"/></svg>Re-run</button>
+      <button type="button" id="tpClose" class="ghost icon-only" title="Hide transcript" aria-label="Hide transcript"><svg class="icon"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="tp-summary">
+      <span id="tpSummary"></span>
+      <span class="tp-bulk">
+        <button type="button" id="tpCutAll" class="ghost">Remove all</button>
+        <button type="button" id="tpKeepAll" class="ghost">Keep all</button>
+      </span>
+    </div>
+    <div class="tp-hint">Click a highlighted filler to hear it · its arrow keeps or removes it · click any word to jump there</div>
+    <div class="tp-body" id="tpBody"></div>
+  </aside>
 </main>
 
 <section class="clip-strip-wrapper">
